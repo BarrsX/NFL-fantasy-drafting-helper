@@ -1,0 +1,14 @@
+pandas
+openpyxl
+numpy
+requests
+beautifulsoup4
+lxml
+selenium
+schedule
+flask
+plotly
+scikit-learn
+nfl-data-py
+espn-api
+yahoo-fantasy-api

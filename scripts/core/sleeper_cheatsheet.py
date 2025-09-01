@@ -1081,7 +1081,7 @@ class ExcelFormatter:
             # Create the conditional formatting rule
             strikethrough_rule = FormulaRule(
                 formula=[f'${drafted_column}2="X"'],
-                font=Font(strikethrough=True, color="808080")
+                font=Font(strikethrough=True, color="808080"),
             )
 
             # Apply to columns A through the column before drafted (A-H if drafted is I)
@@ -1090,11 +1090,11 @@ class ExcelFormatter:
             # Get the last row with data
             last_row = 2  # Start with row 2 (header is row 1)
             for row in range(2, ws.max_row + 1):
-                if ws[f'A{row}'].value is not None:
+                if ws[f"A{row}"].value is not None:
                     last_row = row
 
             # Apply conditional formatting to each column A through last_data_col
-            for col in range(ord('A'), ord(last_data_col) + 1):
+            for col in range(ord("A"), ord(last_data_col) + 1):
                 col_letter = chr(col)
                 range_str = f"{col_letter}2:{col_letter}{last_row}"
                 ws.conditional_formatting.add(range_str, strikethrough_rule)
@@ -1243,6 +1243,59 @@ def load_sleeper_adp(cfg: dict) -> pd.DataFrame:
     return adp_std[["player", "position", "team", "adp"]]
 
 
+def normalize_player_name(name):
+    """Normalize player names by removing common suffixes and standardizing format."""
+    if not isinstance(name, str):
+        return name
+
+    # Convert to title case for consistency
+    name = name.strip().title()
+
+    # Remove common suffixes (Jr., Sr., II, III, etc.)
+    suffixes = [
+        " Jr.",
+        " Sr.",
+        " II",
+        " III",
+        " IV",
+        " V",
+        " Jr",
+        " Sr",
+        " Ii",
+        " Iii",
+        " Iv",
+        " V",
+        " Jr.",
+        " Sr.",
+        " Ii.",
+        " Iii.",
+        " Iv.",
+        " V.",
+    ]
+
+    for suffix in suffixes:
+        if name.endswith(suffix):
+            name = name[: -len(suffix)].strip()
+            break
+
+    # Handle other common name variations
+    import re
+
+    # Remove apostrophes (Ja'Marr -> JaMarr, De'Von -> DeVon)
+    name = name.replace("'", "")
+
+    # Remove periods (A.J. -> AJ, C.J. -> CJ)
+    name = name.replace(".", "")
+
+    # Standardize hyphens (Amon-Ra -> AmonRa, Jaxon Smith-Njigba -> Jaxon SmithNjigba)
+    name = name.replace("-", "")
+
+    # Remove extra spaces and normalize spacing
+    name = re.sub(r"\s+", " ", name).strip()
+
+    return name
+
+
 def load_consensus_projections(cfg: dict) -> pd.DataFrame:
     """
     Load and merge projections from multiple sources using weighted consensus.
@@ -1271,6 +1324,14 @@ def load_consensus_projections(cfg: dict) -> pd.DataFrame:
             # Load and standardize the raw data
             raw_df = load_csv_absolute(path)
             std_df = standardize_offense_position_aware(raw_df)
+
+            # Remove exact duplicates within this source file
+            initial_count = len(std_df)
+            std_df = std_df.drop_duplicates(subset=["player"], keep="first")
+            if len(std_df) < initial_count:
+                print(
+                    f"  📋 Removed {initial_count - len(std_df)} duplicate entries from {name}"
+                )
 
             # Add source identifier for tracking
             std_df["_source"] = name
@@ -1312,31 +1373,39 @@ def load_consensus_projections(cfg: dict) -> pd.DataFrame:
     for df in source_dfs:
         for _, row in df.iterrows():
             player = row["player"]
-            if player not in player_info:
-                player_info[player] = {
+            # Use normalized name for grouping to handle Jr/Sr variations
+            normalized_player = normalize_player_name(player)
+            if normalized_player not in player_info:
+                player_info[normalized_player] = {
+                    "original_names": [player],  # Keep track of original names
                     "position": row.get("position", ""),
                     "team": row.get("team", ""),
                     "age": row.get("age", None),
                 }
+            else:
+                # Add to list of original names if not already present
+                if player not in player_info[normalized_player]["original_names"]:
+                    player_info[normalized_player]["original_names"].append(player)
 
     # Create consensus projections for all players
     consensus_rows = []
 
-    for player, info in player_info.items():
-        # Start with player identification
+    for normalized_player, info in player_info.items():
+        # Start with player identification - use the first original name
         consensus_row = {
-            "player": player,
+            "player": info["original_names"][0],  # Use first original name
             "position": info["position"],
             "team": info["team"],
             "age": info["age"],
         }
 
-        # Find all data for this player across sources
+        # Find all data for this player across sources (using all original names)
         player_data = []
         for df in source_dfs:
-            player_rows = df[df["player"] == player]
-            if not player_rows.empty:
-                player_data.append(player_rows.iloc[0])
+            for original_name in info["original_names"]:
+                player_rows = df[df["player"] == original_name]
+                if not player_rows.empty:
+                    player_data.append(player_rows.iloc[0])
 
         # If we have data for this player from at least one source
         if len(player_data) >= consensus_config.get("min_sources", 1):
@@ -1596,58 +1665,86 @@ def main(
     else:
         pool = off.copy()
 
-    # Name standardization for common mismatches before ADP merge
-    def normalize_player_name(name):
-        """Normalize player names by removing common suffixes and standardizing format."""
-        if not isinstance(name, str):
-            return name
+    # Optional: Integrate NFL data for enhanced rankings
+    nfl_data_config = cfg.get("nfl_data", {})
+    use_nfl_data = nfl_data_config.get("enabled", False)
 
-        # Convert to title case for consistency
-        name = name.strip().title()
+    # Robust boolean conversion - handle pandas Series, numpy arrays, etc.
+    if hasattr(use_nfl_data, "__len__") and not isinstance(use_nfl_data, str):
+        # It's array-like (Series, ndarray, etc.)
+        try:
+            use_nfl_data = (
+                bool(use_nfl_data.iloc[0])
+                if hasattr(use_nfl_data, "iloc") and len(use_nfl_data) > 0
+                else False
+            )
+        except (AttributeError, IndexError, TypeError):
+            use_nfl_data = bool(use_nfl_data) if len(use_nfl_data) > 0 else False
+    else:
+        # It's a scalar value
+        use_nfl_data = bool(use_nfl_data)
 
-        # Remove common suffixes (Jr., Sr., II, III, etc.)
-        suffixes = [
-            " Jr.",
-            " Sr.",
-            " II",
-            " III",
-            " IV",
-            " V",
-            " Jr",
-            " Sr",
-            " Ii",
-            " Iii",
-            " Iv",
-            " V",
-            " Jr.",
-            " Sr.",
-            " Ii.",
-            " Iii.",
-            " Iv.",
-            " V.",
-        ]
+    if use_nfl_data:
+        try:
+            import sys
 
-        for suffix in suffixes:
-            if name.endswith(suffix):
-                name = name[: -len(suffix)].strip()
-                break
+            # Add the scripts/core directory to the path
+            core_path = os.path.dirname(__file__)
+            if core_path not in sys.path:
+                sys.path.insert(0, core_path)
+            from enhanced_fantasy_tool import EnhancedFantasyTool
 
-        # Handle other common name variations
-        import re
+            print("🔄 Integrating NFL data for enhanced rankings...")
+            enhancer = EnhancedFantasyTool()
 
-        # Remove apostrophes (Ja'Marr -> JaMarr, De'Von -> DeVon)
-        name = name.replace("'", "")
+            # Enhance projections with NFL data
+            enhanced_pool = enhancer.enhance_projections_with_nfl_data(
+                pool.copy(),
+                seasons_to_analyze=[
+                    2022,
+                    2023,
+                    2024,
+                ],  # Use multiple seasons for better analysis
+            )
 
-        # Remove periods (A.J. -> AJ, C.J. -> CJ)
-        name = name.replace(".", "")
+            # Add NFL metrics to scoring with fair treatment for younger players
+            # Adjust confidence score to be more fair to rookies and young players
+            enhanced_pool["nfl_confidence_score"] = (
+                # Games played component - use sqrt to reduce penalty for low game counts
+                np.sqrt(enhanced_pool["nfl_games_played"].fillna(0)) * 0.4
+                + enhanced_pool["nfl_consistency_score"].fillna(0.5)
+                * 0.4  # Default to neutral for rookies
+                + (enhanced_pool["nfl_trend"] == "Improving").astype(int).fillna(0)
+                * 0.2
+            )
 
-        # Standardize hyphens (Amon-Ra -> AmonRa, Jaxon Smith-Njigba -> Jaxon SmithNjigba)
-        name = name.replace("-", "")
+            # For rookies (0 games), give them a neutral confidence score instead of 0
+            rookie_mask = enhanced_pool["nfl_games_played"].fillna(0) == 0
+            enhanced_pool.loc[rookie_mask, "nfl_confidence_score"] = (
+                0.5  # Neutral score for rookies
+            )
 
-        # Remove extra spaces and normalize spacing
-        name = re.sub(r"\s+", " ", name).strip()
+            # Adjust Points based on NFL confidence - reduce the impact for younger players
+            # Use a smaller multiplier and cap the adjustment
+            confidence_multiplier = (
+                enhanced_pool["nfl_confidence_score"] * 0.05
+            )  # Reduced from 0.1 to 0.05 (max 5% adjustment)
+            confidence_multiplier = confidence_multiplier.clip(
+                -0.05, 0.05
+            )  # Cap at ±5%
 
-        return name
+            enhanced_pool["Points"] = enhanced_pool["Points"] * (
+                1 + confidence_multiplier
+            )
+
+            # Update pool with enhanced data
+            pool = enhanced_pool.copy()
+            print("✅ NFL data integrated into rankings")
+
+        except ImportError:
+            print("⚠️ NFL data integration not available - continuing without it")
+        except Exception as e:
+            print(f"⚠️ NFL data integration failed: {e} - continuing without it")
 
     # Apply name normalization to both datasets
     adp_copy = adp.copy()
@@ -1664,20 +1761,26 @@ def main(
     # Update the original pool with the merged ADP data
     pool["adp"] = pool_copy["adp"]
 
-    # Handle duplicate player names (e.g., Josh Allen QB vs DL)
-    # For players with same name, keep ADP only for the one with highest projected points
-    duplicate_names = pool[pool.duplicated(subset=["player"], keep=False)][
-        "player"
+    # Apply normalization to the main pool for consistent duplicate detection
+    pool["normalized_name"] = pool["player"].apply(normalize_player_name)
+
+    # Handle duplicate player names using normalized names (catches Jr/Sr variations)
+    duplicate_names = pool[pool.duplicated(subset=["normalized_name"], keep=False)][
+        "normalized_name"
     ].unique()
 
     for dup_name in duplicate_names:
-        dup_players = pool[pool["player"] == dup_name].copy()
+        dup_players = pool[pool["normalized_name"] == dup_name].copy()
         if len(dup_players) > 1:
+            print(
+                f"🔧 Found duplicate players for '{dup_name}': {[p for p in dup_players['player'].tolist()]}"
+            )
             # Find the player with highest points (most likely the "real" player)
             max_points_idx = dup_players["Points"].idxmax()
             # Set ADP to NaN for all except the highest-points player
             pool.loc[
-                (pool["player"] == dup_name) & (pool.index != max_points_idx), "adp"
+                (pool["normalized_name"] == dup_name) & (pool.index != max_points_idx),
+                "adp",
             ] = pd.NA
 
     # Fill missing ADP with high numbers (late picks)
@@ -1770,24 +1873,162 @@ def main(
                 "age": "Age",
             }
         )
-        # Reorder columns for optimal draft use - Draft_Priority first for easy sorting
-        ov = ov[
-            [
-                "Draft_Priority",
-                "Draft_Rank",
-                "Player",
-                "Pos",
-                "Team",
-                "Points",
-                "VORP",
-                "Tier",
-                "adp",
-                "ADP_Diff",
-                "Draft_Value",
-                "Rank",
-            ]
+
+        # Check if NFL data columns are available
+        nfl_columns = [
+            "nfl_games_played",
+            "nfl_avg_ppr",
+            "nfl_trend",
+            "nfl_consistency_score",
+            "nfl_team",
         ]
+        available_nfl_cols = [col for col in nfl_columns if col in ov.columns]
+
+        # Reorder columns for optimal draft use - Draft_Priority first for easy sorting
+        base_columns = [
+            "Draft_Priority",
+            "Draft_Rank",
+            "Player",
+            "Pos",
+            "Team",
+            "Points",
+            "VORP",
+            "Tier",
+            "adp",
+            "ADP_Diff",
+            "Draft_Value",
+            "Rank",
+        ]
+
+        # Add NFL columns if available
+        if available_nfl_cols:
+            # Rename NFL columns for cleaner display
+            nfl_rename_map = {
+                "nfl_games_played": "NFL_Games",
+                "nfl_avg_ppr": "NFL_Avg_PPR",
+                "nfl_trend": "NFL_Trend",
+                "nfl_consistency_score": "NFL_Consistency",
+                "nfl_team": "NFL_Team",
+            }
+            ov = ov.rename(columns=nfl_rename_map)
+            available_nfl_cols = [
+                nfl_rename_map.get(col, col) for col in available_nfl_cols
+            ]
+            base_columns.extend(available_nfl_cols)
+
+        ov = ov[base_columns]
         ov.to_excel(writer, sheet_name="Overall", index=False)
+
+        # Create NFL Data Analysis sheet if NFL data is available
+        if any(
+            col in overall.columns
+            for col in ["nfl_games_played", "nfl_avg_ppr", "nfl_trend"]
+        ):
+            print("📊 Creating NFL Data Analysis sheet...")
+
+            nfl_analysis = overall.copy()
+
+            # Filter to players with NFL data
+            nfl_players = nfl_analysis[
+                nfl_analysis["nfl_games_played"].notna()
+                & (nfl_analysis["nfl_games_played"] > 0)
+            ].copy()
+
+            if not nfl_players.empty:
+                # Create categories for different experience levels
+                nfl_players["Experience_Level"] = "Rookie"
+                nfl_players.loc[
+                    nfl_players["nfl_games_played"] >= 1, "Experience_Level"
+                ] = "Limited"
+                nfl_players.loc[
+                    nfl_players["nfl_games_played"] >= 5, "Experience_Level"
+                ] = "Established"
+                nfl_players.loc[
+                    nfl_players["nfl_games_played"] >= 16, "Experience_Level"
+                ] = "Veteran"
+
+                # Include ALL players with NFL data, not just those with 5+ games
+                meaningful_nfl_data = nfl_players.copy()
+
+                if not meaningful_nfl_data.empty:
+                    # Calculate NFL performance rankings (only for players with games played)
+                    has_games_mask = meaningful_nfl_data["nfl_games_played"] > 0
+                    if has_games_mask.any():
+                        meaningful_nfl_data.loc[has_games_mask, "NFL_PPR_Rank"] = (
+                            meaningful_nfl_data.loc[has_games_mask, "nfl_avg_ppr"].rank(
+                                ascending=False, method="dense"
+                            )
+                        )
+                        meaningful_nfl_data.loc[
+                            has_games_mask, "NFL_Consistency_Rank"
+                        ] = meaningful_nfl_data.loc[
+                            has_games_mask, "nfl_consistency_score"
+                        ].rank(
+                            ascending=False, method="dense"
+                        )
+                    else:
+                        meaningful_nfl_data["NFL_PPR_Rank"] = None
+                        meaningful_nfl_data["NFL_Consistency_Rank"] = None
+
+                    # Create comprehensive NFL analysis sheet
+                    nfl_sheet_data = meaningful_nfl_data[
+                        [
+                            "player",
+                            "position",
+                            "team",
+                            "Points",
+                            "VORP",
+                            "adp",
+                            "nfl_games_played",
+                            "nfl_avg_ppr",
+                            "nfl_trend",
+                            "nfl_consistency_score",
+                            "nfl_volume_trend",
+                            "nfl_team",
+                            "Experience_Level",
+                            "NFL_PPR_Rank",
+                            "NFL_Consistency_Rank",
+                        ]
+                    ].rename(
+                        columns={
+                            "player": "Player",
+                            "position": "Pos",
+                            "team": "Team",
+                            "nfl_games_played": "NFL_Games",
+                            "nfl_avg_ppr": "NFL_Avg_PPR",
+                            "nfl_trend": "Trend",
+                            "nfl_consistency_score": "Consistency",
+                            "nfl_volume_trend": "Volume_Trend",
+                            "nfl_team": "NFL_Team",
+                        }
+                    )
+
+                    # Sort by experience level first, then by NFL performance
+                    nfl_sheet_data = nfl_sheet_data.sort_values(
+                        ["Experience_Level", "NFL_Avg_PPR"], ascending=[True, False]
+                    )
+
+                    nfl_sheet_data.to_excel(
+                        writer, sheet_name="NFL_Analysis", index=False
+                    )
+                    print(
+                        f"✅ NFL Analysis sheet created with {len(nfl_sheet_data)} players (including all experience levels)"
+                    )
+                else:
+                    print("⚠️ No players found with NFL data for analysis sheet")
+
+                # Show summary of all NFL data by experience level
+                rookies_count = (nfl_players["nfl_games_played"] == 0).sum()
+                limited_data_count = (
+                    (nfl_players["nfl_games_played"] > 0)
+                    & (nfl_players["nfl_games_played"] < 5)
+                ).sum()
+                established_count = (nfl_players["nfl_games_played"] >= 5).sum()
+                veteran_count = (nfl_players["nfl_games_played"] >= 16).sum()
+
+                print(
+                    f"📊 NFL Data Summary: {veteran_count} veterans, {established_count - veteran_count} established, {limited_data_count} limited experience, {rookies_count} rookies"
+                )
 
         # Position sheets with enhanced columns
         for pos, dfp in by_pos.items():
@@ -1814,55 +2055,6 @@ def main(
                 ]
             ]
             dfp2.to_excel(writer, sheet_name=pos, index=False)
-
-        # Create Draft Strategy Summary Sheet
-        strategy_data = []
-
-        # Position Summary
-        strategy_data.append(["POSITION SUMMARY", "", "", ""])
-        strategy_data.append(
-            ["Position", "Top Tier Size", "Avg VORP Top 12", "Strategy Note"]
-        )
-
-        for pos in ["QB", "RB", "WR", "TE"]:
-            if pos in by_pos:
-                pos_df = by_pos[pos]
-                tier_1_count = len(pos_df[pos_df["Tier"] == 1])
-                top_12_vorp = (
-                    pos_df.head(12)["VORP"].mean()
-                    if len(pos_df) >= 12
-                    else pos_df["VORP"].mean()
-                )
-
-                if pos == "QB" and cfg["league"]["superflex"]:
-                    note = f"Superflex: Target early (QBs per team: {cfg['league']['superflex_qb_per_team']})"
-                elif tier_1_count <= 3:
-                    note = "Scarce top tier - prioritize early"
-                elif tier_1_count >= 8:
-                    note = "Deep position - can wait"
-                else:
-                    note = "Moderate scarcity"
-
-                strategy_data.append([pos, tier_1_count, f"{top_12_vorp:.1f}", note])
-
-        strategy_data.append(["", "", "", ""])
-        strategy_data.append(["VALUE PICKS (Rank much better than ADP)", "", "", ""])
-        value_picks = ov[ov["ADP_Diff"] >= 15].head(10)
-        strategy_data.append(["Player", "Position", "Rank vs ADP", "Value"])
-        for _, player in value_picks.iterrows():
-            strategy_data.append(
-                [
-                    player["Player"],
-                    player["Pos"],
-                    f"{player['Rank']} vs {player['adp']:.0f}",
-                    player["Draft_Value"],
-                ]
-            )
-
-        strategy_df = pd.DataFrame(strategy_data)
-        strategy_df.to_excel(
-            writer, sheet_name="Draft Strategy", index=False, header=False
-        )
 
         # Create optimized Draft Board sheet for live drafting
         draft_board = overall.copy()
