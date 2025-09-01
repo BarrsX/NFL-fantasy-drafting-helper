@@ -17,9 +17,9 @@ def run_flask_app():
     print("🛑 Press Ctrl+C to stop the server")
     print()
 
-    # Change to web_dashboard directory
+    # Change to src/web directory where the Flask app is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    web_dashboard_dir = os.path.join(script_dir, "web_dashboard")
+    web_dashboard_dir = os.path.join(script_dir, "src", "web")
 
     try:
         # Run flask command

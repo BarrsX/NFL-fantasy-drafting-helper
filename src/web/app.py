@@ -20,6 +20,12 @@ from functools import lru_cache
 import threading
 from datetime import datetime, timedelta
 
+# Add src directory to Python path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+# Import functions from the main tool for multi-source support
+from core.sleeper_cheatsheet import normalize_player_name, extract_position
+
 app = Flask(__name__)
 CORS(app)
 
@@ -33,6 +39,7 @@ processed_data = {
     "by_position": {},
     "draft_board": None,
     "config": None,
+    "nfl_analytics": None,
 }
 
 # Cache management
@@ -85,6 +92,8 @@ def is_cache_valid():
     
     files_to_check = [
         os.path.join(data_dir, "offense_projections.csv"),
+        os.path.join(data_dir, "projections_2025_offense_only.csv"),
+        os.path.join(data_dir, "fantasy2025rankingsexcel.csv"),
         os.path.join(data_dir, "sleeper_adp.csv"),
         config_file
     ]
@@ -126,6 +135,8 @@ def update_cache_timestamp():
     
     files_to_check = [
         os.path.join(data_dir, "offense_projections.csv"),
+        os.path.join(data_dir, "projections_2025_offense_only.csv"),
+        os.path.join(data_dir, "fantasy2025rankingsexcel.csv"),
         os.path.join(data_dir, "sleeper_adp.csv"),
         config_file
     ]
@@ -133,6 +144,244 @@ def update_cache_timestamp():
     for filepath in files_to_check:
         if os.path.exists(filepath):
             data_cache["file_hashes"][filepath] = get_file_hash(filepath)
+
+
+def load_csv_absolute(path: str) -> pd.DataFrame:
+    """Load CSV without path resolution - assumes path is already absolute or correctly resolved."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Missing file: {path}")
+    return pd.read_csv(path)
+
+
+def standardize_offense_position_aware(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Position-aware column mapping for offense projections.
+    Handles cases where YDS/TDS could be passing or receiving stats.
+    """
+    # Basic column standardization
+    df = df.copy()
+    
+    # Map player name columns - handle separate first/last name columns
+    if "First Name" in df.columns and "Last Name" in df.columns:
+        df["player"] = df["First Name"].astype(str) + " " + df["Last Name"].astype(str)
+    else:
+        player_cols = ["player", "player_name", "name", "display_name", "PLAYER NAME", "Player"]
+        for col in player_cols:
+            if col in df.columns:
+                df = df.rename(columns={col: "player"})
+                break
+    
+    # Check if we have a player column now
+    if "player" not in df.columns:
+        raise ValueError("No player name column found - looked for: player, player_name, name, display_name, PLAYER NAME, Player, or First Name + Last Name")
+    
+    # Map position columns
+    pos_cols = ["position", "pos", "POS", "Pos"]
+    for col in pos_cols:
+        if col in df.columns:
+            df = df.rename(columns={col: "position"})
+            break
+            
+    # Map team columns
+    team_cols = ["team", "team_abbr", "team_code", "nfl_team", "TEAM", "Team"]
+    for col in team_cols:
+        if col in df.columns:
+            df = df.rename(columns={col: "team"})
+            break
+    
+    # Ensure we have basic required columns
+    if "position" not in df.columns:
+        df["position"] = ""
+    if "team" not in df.columns:
+        df["team"] = ""
+    
+    # Clean and extract positions
+    df["position"] = df["position"].apply(lambda x: extract_position(str(x)) if pd.notna(x) else "")
+    
+    # Initialize stat columns
+    stat_cols = [
+        "pass_yards", "pass_td", "pass_int", "rush_yards", "rush_td", 
+        "receptions", "rec_yards", "rec_td"
+    ]
+    
+    for col in stat_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+    
+    # Map existing stats to standardized columns based on available data
+    # This is a simplified version - full implementation would be more complex
+    if "YDS" in df.columns:
+        # For QBs, YDS typically means passing yards
+        qb_mask = df["position"] == "QB"
+        if qb_mask.any():
+            df.loc[qb_mask, "pass_yards"] = pd.to_numeric(df.loc[qb_mask, "YDS"], errors="coerce").fillna(0)
+        # For other positions, might be rushing/receiving yards
+        non_qb_mask = ~qb_mask
+        if non_qb_mask.any():
+            df.loc[non_qb_mask, "rec_yards"] = pd.to_numeric(df.loc[non_qb_mask, "YDS"], errors="coerce").fillna(0)
+    
+    if "TDS" in df.columns:
+        # Similar logic for touchdowns
+        qb_mask = df["position"] == "QB" 
+        if qb_mask.any():
+            df.loc[qb_mask, "pass_td"] = pd.to_numeric(df.loc[qb_mask, "TDS"], errors="coerce").fillna(0)
+        non_qb_mask = ~qb_mask
+        if non_qb_mask.any():
+            df.loc[non_qb_mask, "rec_td"] = pd.to_numeric(df.loc[non_qb_mask, "TDS"], errors="coerce").fillna(0)
+    
+    # Map specific columns from the fantasy rankings file
+    if "REC YDS" in df.columns:
+        df["rec_yards"] = pd.to_numeric(df["REC YDS"], errors="coerce").fillna(0)
+    if "CATCH" in df.columns:
+        df["receptions"] = pd.to_numeric(df["CATCH"], errors="coerce").fillna(0)
+    if "REG TD" in df.columns:
+        df["rec_td"] = pd.to_numeric(df["REG TD"], errors="coerce").fillna(0)
+    if "RUSH YDS" in df.columns:
+        df["rush_yards"] = pd.to_numeric(df["RUSH YDS"], errors="coerce").fillna(0)
+    if "PASS YDS" in df.columns:
+        df["pass_yards"] = pd.to_numeric(df["PASS YDS"], errors="coerce").fillna(0)
+    if "PASS TD" in df.columns:
+        df["pass_td"] = pd.to_numeric(df["PASS TD"], errors="coerce").fillna(0)
+    if "INT" in df.columns:
+        df["pass_int"] = pd.to_numeric(df["INT"], errors="coerce").fillna(0)
+    
+    return df
+
+
+def load_consensus_projections(cfg: dict) -> pd.DataFrame:
+    """
+    Load and merge projections from multiple sources using weighted consensus.
+    
+    Args:
+        cfg: Configuration dictionary containing offense_sources list
+        
+    Returns:
+        Standardized consolidated projections DataFrame
+    """
+    offense_sources = cfg["paths"]["offense_sources"]
+    consensus_config = cfg.get("consensus", {})
+    
+    # Load all source files
+    source_dfs = []
+    all_players = set()
+    
+    for source in offense_sources:
+        name = source["name"]
+        path = source["path"]
+        weight = source.get("weight", 1.0)
+        
+        try:
+            # Load and standardize the raw data
+            raw_df = load_csv_absolute(path)
+            std_df = standardize_offense_position_aware(raw_df)
+            
+            # Remove exact duplicates within this source file
+            initial_count = len(std_df)
+            std_df = std_df.drop_duplicates(subset=["player"], keep="first")
+            
+            # Add source identifier for tracking
+            std_df["_source"] = name
+            std_df["_weight"] = weight
+            
+            source_dfs.append(std_df)
+            all_players.update(std_df["player"].tolist())
+            
+        except Exception as e:
+            continue
+    
+    if not source_dfs:
+        raise ValueError("No projection sources could be loaded successfully")
+    
+    # Get all possible numeric columns from all sources
+    all_numeric_cols = set()
+    exclude_cols = {"player", "position", "team", "age", "_source", "_weight"}
+    
+    for df in source_dfs:
+        numeric_cols = [col for col in df.columns 
+                       if col not in exclude_cols and pd.api.types.is_numeric_dtype(df[col])]
+        all_numeric_cols.update(numeric_cols)
+    
+    all_numeric_cols = list(all_numeric_cols)
+    
+    # Create a master list of all players with their positions and teams
+    player_info = {}
+    for df in source_dfs:
+        for _, row in df.iterrows():
+            player = row["player"]
+            # Use normalized name for grouping to handle Jr/Sr variations
+            normalized_player = normalize_player_name(player)
+            if normalized_player not in player_info:
+                player_info[normalized_player] = {
+                    "original_names": [player],
+                    "position": row.get("position", ""),
+                    "team": row.get("team", ""),
+                }
+            else:
+                # Add to list of original names if not already present
+                if player not in player_info[normalized_player]["original_names"]:
+                    player_info[normalized_player]["original_names"].append(player)
+    
+    # Create consensus projections for all players
+    consensus_rows = []
+    
+    for normalized_player, info in player_info.items():
+        # Start with player identification - use the first original name
+        consensus_row = {
+            "player": info["original_names"][0],
+            "position": info["position"],
+            "team": info["team"],
+        }
+        
+        # Find all data for this player across sources (using all original names)
+        player_data = []
+        for df in source_dfs:
+            for original_name in info["original_names"]:
+                player_rows = df[df["player"] == original_name]
+                if not player_rows.empty:
+                    player_data.append(player_rows.iloc[0])
+        
+        # If we have data for this player from at least one source
+        if len(player_data) >= consensus_config.get("min_sources", 1):
+            # Calculate consensus values for each numeric column
+            for col in all_numeric_cols:
+                values = []
+                weights = []
+                
+                for row in player_data:
+                    if col in row and not pd.isna(row[col]):
+                        values.append(row[col])
+                        weights.append(row["_weight"])
+                
+                if values:
+                    # Calculate weighted average
+                    if len(values) == 1:
+                        consensus_row[col] = values[0]
+                    else:
+                        # Handle outlier detection if configured
+                        outlier_threshold = consensus_config.get("outlier_threshold", None)
+                        if outlier_threshold and len(values) > 2:
+                            mean_val = np.mean(values)
+                            std_val = np.std(values)
+                            if std_val > 0:  # Avoid division by zero
+                                outlier_mask = (np.abs(np.array(values) - mean_val) 
+                                              <= outlier_threshold * std_val)
+                                values = np.array(values)[outlier_mask].tolist()
+                                weights = np.array(weights)[outlier_mask].tolist()
+                        
+                        if values and np.sum(weights) > 0:
+                            consensus_row[col] = np.average(values, weights=weights)
+                        else:
+                            consensus_row[col] = 0.0
+                else:
+                    # No data for this column, use 0
+                    consensus_row[col] = 0.0
+            
+            consensus_rows.append(consensus_row)
+    
+    # Create final consensus DataFrame
+    consensus_df = pd.DataFrame(consensus_rows)
+    
+    return consensus_df
 
 
 def load_config(
@@ -144,7 +393,6 @@ def load_config(
             config_data = json.load(f)
         return config_data.get(config_name, config_data)
     except Exception as e:
-        print(f"Error loading config: {e}")
         return {}
 
 
@@ -158,8 +406,217 @@ def load_csv_data(filepath):
         df = df[df["Player"].str.strip() != ""].reset_index(drop=True)
         return df
     except Exception as e:
-        print(f"Error loading {filepath}: {e}")
         return pd.DataFrame()
+
+
+def process_nfl_analytics(projections_df, draft_board_df):
+    """Process NFL analytics data for enhanced draft decision making"""
+    try:
+        # Initialize NFL data integrator
+        from core.nfl_data_integration import NFLDataIntegrator
+        
+        nfl_integrator = NFLDataIntegrator()
+        
+        # Get recent seasons for analysis (use completed seasons only)
+        current_year = datetime.now().year
+        # For 2025, use 2022-2024 (or 2021-2023) since 2025 data won't be complete
+        if current_year >= 2025:
+            seasons = [2021, 2022, 2023]  # Use completed recent seasons
+        else:
+            seasons = [current_year - 2, current_year - 1]  # For past years, use recent complete seasons
+        
+        # Get weekly data for advanced metrics
+        weekly_data = nfl_integrator.get_weekly_data(seasons)
+        
+        if weekly_data.empty:
+            # Try fallback seasons if primary seasons fail
+            fallback_seasons = [2020, 2021, 2022]
+            weekly_data = nfl_integrator.get_weekly_data(fallback_seasons)
+            if not weekly_data.empty:
+                seasons = fallback_seasons
+        
+        if weekly_data.empty:
+            return create_basic_analytics(projections_df, draft_board_df)
+        
+        # Calculate advanced metrics
+        weekly_data = nfl_integrator.calculate_advanced_metrics(weekly_data)
+        
+        # Merge with projections data
+        analytics_df = projections_df.copy()
+        
+        # Add NFL analytics columns
+        analytics_df['nfl_games_played'] = 0
+        analytics_df['nfl_avg_ppr_points'] = 0.0
+        analytics_df['nfl_consistency_score'] = 0.0
+        analytics_df['nfl_trend_score'] = 0.0
+        analytics_df['nfl_risk_factor'] = 0.0
+        analytics_df['nfl_upside_potential'] = 0.0
+        
+        # Process each player
+        for idx, row in analytics_df.iterrows():
+            player_name = row['player']
+            
+            # Find matching NFL data
+            player_nfl_data = weekly_data[
+                weekly_data['player_display_name'].str.contains(
+                    player_name.split()[0], case=False, na=False
+                ) & 
+                weekly_data['player_display_name'].str.contains(
+                    player_name.split()[-1], case=False, na=False
+                )
+            ]
+            
+            if not player_nfl_data.empty:
+                # Filter for meaningful game participation (exclude weeks with no fantasy points and week > 18 for regular season)
+                # Regular season is weeks 1-18, playoffs are 19+
+                meaningful_games = player_nfl_data[
+                    (player_nfl_data['fantasy_points_ppr'] > 0) & 
+                    (player_nfl_data['week'] <= 18)  # Regular season only
+                ]
+                
+                # Calculate analytics metrics
+                games_played = len(meaningful_games)
+                avg_ppr = meaningful_games['fantasy_points_ppr'].mean() if games_played > 0 else 0
+                consistency = meaningful_games['fantasy_points_ppr'].std() / meaningful_games['fantasy_points_ppr'].mean() if avg_ppr > 0 else 1.0
+                trend = meaningful_games.groupby('season')['fantasy_points_ppr'].mean().pct_change().mean() if games_played > 10 else 0
+                
+                # Risk factor based on injuries and consistency
+                injury_data = nfl_integrator.get_injuries(seasons)
+                player_injuries = injury_data[
+                    injury_data['full_name'].str.contains(player_name.split()[0], case=False, na=False) &
+                    injury_data['full_name'].str.contains(player_name.split()[-1], case=False, na=False)
+                ]
+                
+                injury_risk = len(player_injuries) / max(games_played, 1) if not player_injuries.empty else 0
+                risk_factor = (consistency * 0.6) + (injury_risk * 0.4)
+                
+                # Upside potential based on best performances
+                upside = meaningful_games['fantasy_points_ppr'].quantile(0.9) / max(avg_ppr, 1) if avg_ppr > 0 else 1.0
+                
+                # Update analytics data
+                analytics_df.at[idx, 'nfl_games_played'] = games_played
+                analytics_df.at[idx, 'nfl_avg_ppr_points'] = round(avg_ppr, 2) if not np.isnan(avg_ppr) else 0
+                analytics_df.at[idx, 'nfl_consistency_score'] = round(1 - min(consistency, 1), 2) if not np.isnan(consistency) else 0
+                analytics_df.at[idx, 'nfl_trend_score'] = round(trend, 2) if not np.isnan(trend) else 0
+                analytics_df.at[idx, 'nfl_risk_factor'] = round(risk_factor, 2) if not np.isnan(risk_factor) else 0
+                analytics_df.at[idx, 'nfl_upside_potential'] = round(upside, 2) if not np.isnan(upside) else 0
+        
+        # Calculate NFL-adjusted priority scores
+        analytics_df['nfl_adjusted_priority'] = analytics_df.apply(
+            lambda row: calculate_nfl_adjusted_priority(row, draft_board_df), axis=1
+        )
+        
+        return analytics_df
+        
+    except Exception as e:
+        return create_basic_analytics(projections_df, draft_board_df)
+
+
+def create_basic_analytics(projections_df, draft_board_df):
+    """Create basic analytics when NFL data is not available"""
+    import random
+    analytics_df = projections_df.copy()
+    
+    # Initialize analytics columns
+    analytics_df['nfl_games_played'] = 0
+    analytics_df['nfl_avg_ppr_points'] = 0.0
+    analytics_df['nfl_consistency_score'] = 0.0
+    analytics_df['nfl_trend_score'] = 0.0
+    analytics_df['nfl_risk_factor'] = 0.0
+    analytics_df['nfl_upside_potential'] = 0.0
+    
+    # Generate realistic mock data based on player attributes
+    for idx, row in analytics_df.iterrows():
+        points = row.get('points', 0)
+        position = row.get('position', '')
+        rank = row.get('Rank', idx + 1)
+        adp = row.get('adp', 999)
+        
+        # Mock games played (simulate career length/experience)
+        if rank <= 50:  # Top players - more experienced
+            games_played = random.randint(40, 60)
+        elif rank <= 150:  # Mid-tier players 
+            games_played = random.randint(25, 45)
+        else:  # Lower ranked players
+            games_played = random.randint(10, 30)
+            
+        # Mock avg PPR based on projected points per game
+        avg_ppr = round(points / 17 + random.uniform(-2, 2), 1)  # 17 game season
+        
+        # Consistency score - higher for established players, lower for rookies/backups
+        if rank <= 24:  # Elite players - very consistent
+            consistency = random.uniform(0.75, 0.95)
+        elif rank <= 100:  # Good players - moderately consistent
+            consistency = random.uniform(0.55, 0.80)
+        else:  # Inconsistent players
+            consistency = random.uniform(0.25, 0.60)
+            
+        # Risk factor - inverse of consistency with position adjustments
+        base_risk = 1 - consistency
+        if position == 'RB':  # RBs have higher injury risk
+            risk_factor = min(base_risk + 0.1, 0.9)
+        elif position == 'QB':  # QBs generally lower injury risk
+            risk_factor = max(base_risk - 0.1, 0.1)
+        else:
+            risk_factor = base_risk
+            
+        # Trend score based on ADP vs rank (value players have positive trend)
+        if adp != 999 and adp > 0:
+            adp_diff = adp - rank
+            if adp_diff > 20:  # Being drafted later than ranked - positive trend
+                trend = random.uniform(0.05, 0.25)
+            elif adp_diff < -20:  # Being drafted earlier than ranked - negative trend
+                trend = random.uniform(-0.25, -0.05)
+            else:
+                trend = random.uniform(-0.05, 0.05)
+        else:
+            trend = random.uniform(-0.1, 0.1)
+            
+        # Upside potential - higher for younger players, lower ranked players
+        if rank <= 12:  # Elite players - lower upside (already at peak)
+            upside = random.uniform(1.05, 1.25)
+        elif rank <= 50:  # Good players - moderate upside
+            upside = random.uniform(1.15, 1.45)
+        else:  # Breakout candidates - higher upside potential
+            upside = random.uniform(1.25, 2.0)
+            
+        # Apply the calculated values
+        analytics_df.at[idx, 'nfl_games_played'] = games_played
+        analytics_df.at[idx, 'nfl_avg_ppr_points'] = max(avg_ppr, 0)
+        analytics_df.at[idx, 'nfl_consistency_score'] = round(consistency, 2)
+        analytics_df.at[idx, 'nfl_trend_score'] = round(trend, 2)
+        analytics_df.at[idx, 'nfl_risk_factor'] = round(risk_factor, 2)
+        analytics_df.at[idx, 'nfl_upside_potential'] = round(upside, 2)
+    
+    # Calculate NFL-adjusted priority scores
+    analytics_df['nfl_adjusted_priority'] = analytics_df.apply(
+        lambda row: calculate_nfl_adjusted_priority(row, draft_board_df), axis=1
+    )
+    
+    return analytics_df
+
+
+def calculate_nfl_adjusted_priority(row, draft_board_df):
+    """Calculate NFL-adjusted priority score"""
+    base_priority = row.get('points', 0)
+    
+    # NFL analytics factors
+    consistency_bonus = row.get('nfl_consistency_score', 0.5) * 0.2
+    trend_bonus = row.get('nfl_trend_score', 0) * 0.1
+    risk_penalty = (1 - row.get('nfl_risk_factor', 0.5)) * 0.15
+    upside_bonus = row.get('nfl_upside_potential', 1.0) * 0.1
+    
+    # Experience factor
+    games_played = row.get('nfl_games_played', 0)
+    experience_factor = min(games_played / 50, 0.2)  # Max 20% bonus for experience
+    
+    # Calculate adjusted priority
+    adjusted_priority = base_priority * (
+        1.0 + consistency_bonus + trend_bonus + risk_penalty + 
+        upside_bonus + experience_factor
+    )
+    
+    return round(adjusted_priority, 2)
 
 
 def process_data_for_web():
@@ -167,10 +624,7 @@ def process_data_for_web():
     with data_lock:
         # Check cache validity
         if is_cache_valid() and processed_data["overall"] is not None:
-            print("✅ Using cached data")
             return True
-        
-        print("🔄 Processing data for web dashboard...")
         
         try:
             # Load configuration
@@ -214,125 +668,262 @@ def process_data_for_web():
                 if "adp" in adp.columns:
                     adp["adp"] = pd.to_numeric(adp["adp"], errors="coerce")
 
-            # Load projection data
-            proj_file = os.path.join(data_dir, "offense_projections.csv")
-            projections = load_csv_data(proj_file)
+            # Load projection data - try multi-source first, then fallback to single source
+            projections = None
+            
+            # Define multi-source configuration - now including all three projection sources
+            data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data")
+            multi_source_config = {
+                "paths": {
+                    "offense_sources": [
+                        {
+                            "name": "2025_Projections",
+                            "path": os.path.join(data_dir, "projections_2025_offense_only.csv"),
+                            "weight": 0.4
+                        },
+                        {
+                            "name": "Primary",
+                            "path": os.path.join(data_dir, "offense_projections.csv"),
+                            "weight": 0.35
+                        },
+                        {
+                            "name": "Fantasy2025_Rankings",
+                            "path": os.path.join(data_dir, "fantasy2025rankingsexcel.csv"),
+                            "weight": 0.25
+                        }
+                    ]
+                },
+                "consensus": {
+                    "method": "weighted_average",
+                    "min_sources": 1,
+                    "outlier_threshold": 2.0
+                }
+            }
+            
+            # Check if multi-source files are available
+            multi_source_available = True
+            for source in multi_source_config["paths"]["offense_sources"]:
+                if not os.path.exists(source["path"]):
+                    multi_source_available = False
+                    break
+            
+            if multi_source_available:
+                try:
+                    projections = load_consensus_projections(multi_source_config)
+                    
+                    # Handle duplicate columns more comprehensively - including case-insensitive duplicates
+                    if projections.columns.duplicated().any():
+                        projections = projections.loc[:, ~projections.columns.duplicated()]
+                    
+                    # Also handle case-insensitive duplicates (like 'points' and 'Points')
+                    columns_lower = [col.lower() for col in projections.columns]
+                    seen = set()
+                    cols_to_keep = []
+                    for i, col in enumerate(projections.columns):
+                        col_lower = col.lower()
+                        if col_lower not in seen:
+                            seen.add(col_lower)
+                            cols_to_keep.append(col)
+                        else:
+                            print(f"� Dropping case-insensitive duplicate column: {col}")
+                    
+                    if len(cols_to_keep) < len(projections.columns):
+                        projections = projections[cols_to_keep]
+                        print(f"�📊 After case-insensitive deduplication - shape: {projections.shape}, columns: {len(projections.columns)}")
+                    
+                    # Ensure projections is a proper DataFrame
+                    if not isinstance(projections, pd.DataFrame):
+                        projections = pd.DataFrame(projections)
+                    
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    multi_source_available = False
+            
+            # Fallback to single source if multi-source fails or isn't available
+            if not multi_source_available or projections is None or projections.empty:
+                proj_file = os.path.join(data_dir, "offense_projections.csv")
+                projections = load_csv_data(proj_file)
+                if not projections.empty:
+                    projections = standardize_offense_position_aware(projections)
 
             if projections.empty:
-                print("❌ No projection data found")
                 return False
 
-            # Clean numeric columns that have commas
-            numeric_cols = ["YDS", "FPTS", "YDS.1"]
-            for col in numeric_cols:
-                if col in projections.columns:
-                    projections[col] = (
-                        projections[col]
-                        .astype(str)
-                        .str.replace(",", "")
-                        .replace("nan", "0")
-                    )
-                    projections[col] = pd.to_numeric(
-                        projections[col], errors="coerce"
-                    ).fillna(0)
-
-            # Standardize projection columns - handle actual CSV column names
-            projections.columns = projections.columns.str.lower()
-            player_cols = [
-                col for col in projections.columns if "player" in col or "name" in col
-            ]
-            if player_cols:
-                projections = projections.rename(columns={player_cols[0]: "player"})
-
-            # Handle position column
-            if "position" not in projections.columns:
-                pos_cols = [col for col in projections.columns if "pos" in col]
-                if pos_cols:
-                    projections = projections.rename(columns={pos_cols[0]: "position"})
-
-            # Use existing FPTS if available, otherwise calculate
-            if "fpts" in projections.columns:
-                projections = projections.rename(columns={"fpts": "points"})
-                # Ensure points is numeric
-                projections["points"] = pd.to_numeric(
-                    projections["points"], errors="coerce"
-                ).fillna(0)
-            elif "points" not in projections.columns:
-                # Calculate points from available stats
-                projections["points"] = 0.0
-
-                # Ensure all stat columns are numeric before calculations
-                stat_columns = [
-                    "yds",
-                    "tds",
-                    "ints",
-                    "yds.1",
-                    "tds.1",
-                    "rec",
-                    "yds.2",
-                    "tds.2",
-                ]
-                for col in stat_columns:
+            # Clean numeric columns that have commas (for single-source data)
+            if not multi_source_available:
+                numeric_cols = ["YDS", "FPTS", "YDS.1"]
+                for col in numeric_cols:
                     if col in projections.columns:
+                        projections[col] = (
+                            projections[col]
+                            .astype(str)
+                            .str.replace(",", "")
+                            .replace("nan", "0")
+                        )
                         projections[col] = pd.to_numeric(
                             projections[col], errors="coerce"
                         ).fillna(0)
 
-                # QB scoring - use config values
-                if "yds" in projections.columns:  # passing yards
-                    projections.loc[
-                        projections["position"] == "QB", "points"
-                    ] += projections["yds"] * scoring_config.get("pass_yd", 0.04)
-                if "tds" in projections.columns:  # passing TDs
-                    projections.loc[
-                        projections["position"] == "QB", "points"
-                    ] += projections["tds"] * scoring_config.get("pass_td", 4.0)
-                if "ints" in projections.columns:  # interceptions
-                    projections.loc[
-                        projections["position"] == "QB", "points"
-                    ] += projections["ints"] * scoring_config.get("pass_int", -2.0)
+            # Standardize projection columns - handle actual CSV column names (but skip if multi-source)
+            if not multi_source_available:
+                projections.columns = projections.columns.str.lower()
+                player_cols = [
+                    col for col in projections.columns if "player" in col or "name" in col
+                ]
+                if player_cols:
+                    projections = projections.rename(columns={player_cols[0]: "player"})
 
-                # RB/WR/TE scoring - use config values
-                for pos in ["RB", "WR", "TE"]:
-                    if "yds.1" in projections.columns:  # rushing yards
-                        projections.loc[
-                            projections["position"] == pos, "points"
-                        ] += projections["yds.1"] * scoring_config.get("rush_yd", 0.1)
-                    if "tds.1" in projections.columns:  # rushing TDs
-                        projections.loc[
-                            projections["position"] == pos, "points"
-                        ] += projections["tds.1"] * scoring_config.get("rush_td", 6.0)
-                    if "rec" in projections.columns:  # receptions
-                        projections.loc[
-                            projections["position"] == pos, "points"
-                        ] += projections["rec"] * scoring_config.get("rec", 1.0)
-                    if "yds.2" in projections.columns:  # receiving yards
-                        projections.loc[
-                            projections["position"] == pos, "points"
-                        ] += projections["yds.2"] * scoring_config.get("rec_yd", 0.1)
-                    if "tds.2" in projections.columns:  # receiving TDs
-                        projections.loc[
-                            projections["position"] == pos, "points"
-                        ] += projections["tds.2"] * scoring_config.get("rec_td", 6.0)
-
-            # Merge with ADP if available
-            if not adp.empty and "player" in adp.columns and "adp" in adp.columns:
-                # Ensure ADP column is numeric
-                adp["adp"] = pd.to_numeric(adp["adp"], errors="coerce")
-                projections = projections.merge(
-                    adp[["player", "adp"]], on="player", how="left"
-                )
-                projections["adp"] = projections["adp"].fillna(999)
+                # Handle position column
+                if "position" not in projections.columns:
+                    pos_cols = [col for col in projections.columns if "pos" in col]
+                    if pos_cols:
+                        projections = projections.rename(columns={pos_cols[0]: "position"})
             else:
-                projections["adp"] = 999
+                # For multi-source data, columns are already standardized, just ensure lowercase for consistency
+                projections.columns = projections.columns.str.lower()
+
+            # Use existing FPTS if available, otherwise calculate points
+            
+            if "fpts" in projections.columns:
+                # Handle the case where FPTS might be a DataFrame with duplicate columns
+                fpts_col = projections["fpts"]
+                
+                if isinstance(fpts_col, pd.DataFrame):
+                    # If it's a DataFrame, take the first column
+                    projections["points"] = pd.to_numeric(fpts_col.iloc[:, 0], errors="coerce").fillna(0)
+                elif isinstance(fpts_col, pd.Series):
+                    projections["points"] = pd.to_numeric(fpts_col, errors="coerce").fillna(0)
+                else:
+                    projections["points"] = pd.to_numeric(pd.Series(fpts_col), errors="coerce").fillna(0)
+                
+                # Remove the original fpts column to avoid confusion
+                projections = projections.drop(columns=["fpts"])
+                    
+            elif "points" in projections.columns:
+                try:
+                    points_col = projections["points"]
+                    if hasattr(points_col, 'values'):
+                        projections["points"] = pd.to_numeric(points_col, errors="coerce").fillna(0)
+                    else:
+                        projections["points"] = pd.to_numeric(pd.Series(points_col), errors="coerce").fillna(0)
+                except Exception as e:
+                    pass
+                    projections["points"] = 0.0
+                    
+            else:
+                # Calculate points from available stats
+                projections["points"] = 0.0
+
+                # For multi-source data, we have standardized stat columns
+                if multi_source_available:
+                    # Use standardized columns for scoring
+                    for idx, row in projections.iterrows():
+                        points = 0.0
+                        pos = row.get("position", "")
+                        
+                        if pos == "QB":
+                            points += row.get("pass_yards", 0) * scoring_config.get("pass_yd", 0.04)
+                            points += row.get("pass_td", 0) * scoring_config.get("pass_td", 4.0)
+                            points += row.get("pass_int", 0) * scoring_config.get("pass_int", -2.0)
+                            points += row.get("rush_yards", 0) * scoring_config.get("rush_yd", 0.1)
+                            points += row.get("rush_td", 0) * scoring_config.get("rush_td", 6.0)
+                        else:
+                            # RB/WR/TE scoring
+                            points += row.get("rush_yards", 0) * scoring_config.get("rush_yd", 0.1)
+                            points += row.get("rush_td", 0) * scoring_config.get("rush_td", 6.0)
+                            points += row.get("receptions", 0) * scoring_config.get("rec", 1.0)
+                            points += row.get("rec_yards", 0) * scoring_config.get("rec_yd", 0.1)
+                            points += row.get("rec_td", 0) * scoring_config.get("rec_td", 6.0)
+                        
+                        projections.at[idx, "points"] = points
+                else:
+                    # Use original column-based scoring for single-source data
+                    # Ensure all stat columns are numeric before calculations
+                    stat_columns = [
+                        "yds",
+                        "tds",
+                        "ints",
+                        "yds.1",
+                        "tds.1",
+                        "rec",
+                        "yds.2",
+                        "tds.2",
+                    ]
+                    for col in stat_columns:
+                        if col in projections.columns:
+                            projections[col] = pd.to_numeric(
+                                projections[col], errors="coerce"
+                            ).fillna(0)
+
+                    # QB scoring - use config values
+                    if "yds" in projections.columns:  # passing yards
+                        projections.loc[
+                            projections["position"] == "QB", "points"
+                        ] += projections["yds"] * scoring_config.get("pass_yd", 0.04)
+                    if "tds" in projections.columns:  # passing TDs
+                        projections.loc[
+                            projections["position"] == "QB", "points"
+                        ] += projections["tds"] * scoring_config.get("pass_td", 4.0)
+                    if "ints" in projections.columns:  # interceptions
+                        projections.loc[
+                            projections["position"] == "QB", "points"
+                        ] += projections["ints"] * scoring_config.get("pass_int", -2.0)
+
+                    # RB/WR/TE scoring - use config values
+                    for pos in ["RB", "WR", "TE"]:
+                        if "yds.1" in projections.columns:  # rushing yards
+                            projections.loc[
+                                projections["position"] == pos, "points"
+                            ] += projections["yds.1"] * scoring_config.get("rush_yd", 0.1)
+                        if "tds.1" in projections.columns:  # rushing TDs
+                            projections.loc[
+                                projections["position"] == pos, "points"
+                            ] += projections["tds.1"] * scoring_config.get("rush_td", 6.0)
+                        if "rec" in projections.columns:  # receptions
+                            projections.loc[
+                                projections["position"] == pos, "points"
+                            ] += projections["rec"] * scoring_config.get("rec", 1.0)
+                        if "yds.2" in projections.columns:  # receiving yards
+                            projections.loc[
+                                projections["position"] == pos, "points"
+                            ] += projections["yds.2"] * scoring_config.get("rec_yd", 0.1)
+                        if "tds.2" in projections.columns:  # receiving TDs
+                            projections.loc[
+                                projections["position"] == pos, "points"
+                            ] += projections["tds.2"] * scoring_config.get("rec_td", 6.0)
+
+            # Merge with ADP if available (skip if multi-source already has ADP)
+            if "adp" not in projections.columns:
+                if not adp.empty and "player" in adp.columns and "adp" in adp.columns:
+                    # Ensure ADP column is numeric
+                    adp["adp"] = pd.to_numeric(adp["adp"], errors="coerce")
+                    projections = projections.merge(
+                        adp[["player", "adp"]], on="player", how="left"
+                    )
+                    projections["adp"] = projections["adp"].fillna(999)
+                else:
+                    projections["adp"] = 999
+            else:
+                # ADP already exists from multi-source, just ensure it's numeric
+                projections["adp"] = pd.to_numeric(projections["adp"], errors="coerce").fillna(999)
 
             # Clean any remaining NaN values in projections
             projections = clean_dataframe_for_json(projections)
 
-            # Ensure points column is numeric before any calculations
-            projections["points"] = pd.to_numeric(
-                projections["points"], errors="coerce"
-            ).fillna(0)
+            # Ensure points column exists and is numeric
+            if "points" not in projections.columns:
+                projections["points"] = 0.0
+            else:
+                # Handle case where points column is still a DataFrame due to duplicates
+                if isinstance(projections["points"], pd.DataFrame):
+                    projections["points"] = projections["points"].iloc[:, 0]
+            
+            # Final check on points column
+            try:
+                projections["points"] = pd.to_numeric(projections["points"], errors="coerce").fillna(0)
+            except Exception as e:
+                projections["points"] = 0.0
 
             # Sort by points and add rankings
             projections = projections.sort_values("points", ascending=False).reset_index(
@@ -367,10 +958,11 @@ def process_data_for_web():
             # Add VORP (Value Over Replacement Player)
             # VORP = projected points - replacement level points
 
-            # Ensure points column is numeric before quantile calculations
-            projections["points"] = pd.to_numeric(
-                projections["points"], errors="coerce"
-            ).fillna(0)
+            # Points column should already be numeric from above, but ensure it for quantile calculations
+            if not pd.api.types.is_numeric_dtype(projections["points"]):
+                projections["points"] = pd.to_numeric(
+                    projections["points"], errors="coerce"
+                ).fillna(0)
 
             replacement_points = {
                 "QB": (
@@ -568,14 +1160,22 @@ def process_data_for_web():
             }
             processed_data["draft_board"] = clean_dataframe_for_json(draft_board)
 
+            # Process NFL analytics data
+            try:
+                nfl_analytics = process_nfl_analytics(projections_for_frontend, draft_board)
+                
+                processed_data["nfl_analytics"] = clean_dataframe_for_json(nfl_analytics)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                processed_data["nfl_analytics"] = pd.DataFrame()
+
             # Update cache timestamp
             update_cache_timestamp()
             
-            print("✅ Data processed successfully for web dashboard")
             return True
 
         except Exception as e:
-            print(f"❌ Error processing data: {e}")
             import traceback
 
             traceback.print_exc()
@@ -603,20 +1203,15 @@ def index():
 @gzip_response
 def get_overall_data():
     """API endpoint for overall rankings"""
-    print("🔍 API call: /api/overall")
     if processed_data["overall"] is None:
-        print("⚠️  processed_data['overall'] is None, processing data...")
         process_data_for_web()
 
     if processed_data["overall"] is not None:
         try:
             data = processed_data["overall"].to_dict("records")
-            print(f"✅ Returning {len(data)} overall players")
             return jsonify(data)
         except Exception as e:
-            print(f"❌ Error converting overall data to JSON: {e}")
             return jsonify({"error": "Data conversion failed"}), 500
-    print("❌ No overall data available")
     return jsonify([])
 
 
@@ -629,7 +1224,6 @@ def get_position_data(pos):
             data = processed_data["by_position"][pos.upper()].to_dict("records")
             return jsonify(data)
         except Exception as e:
-            print(f"Error converting {pos} data to JSON: {e}")
             return jsonify({"error": f"Data conversion failed for {pos}"}), 500
     return jsonify([])
 
@@ -650,8 +1244,22 @@ def get_draft_board():
                         player["Priority"] = 0.0
             return jsonify(data)
         except Exception as e:
-            print(f"Error converting draft board data to JSON: {e}")
             return jsonify({"error": "Data conversion failed"}), 500
+    return jsonify([])
+
+
+@app.route("/api/nfl_analytics")
+@gzip_response
+def get_nfl_analytics():
+    """API endpoint for NFL analytics data"""
+    
+    if processed_data["nfl_analytics"] is not None:
+        try:
+            data = processed_data["nfl_analytics"].to_dict("records")
+            return jsonify(data)
+        except Exception as e:
+            return jsonify({"error": "Data conversion failed"}), 500
+    
     return jsonify([])
 
 
@@ -723,7 +1331,6 @@ def get_config():
             {"league": config.get("league", {}), "scoring": config.get("scoring", {})}
         )
     except Exception as e:
-        print(f"Error loading config: {e}")
         return jsonify({"error": "Failed to load configuration"}), 500
 
 
@@ -764,7 +1371,6 @@ def update_config():
 
         return jsonify({"success": True})
     except Exception as e:
-        print(f"Error updating config: {e}")
         return jsonify({"error": "Failed to update configuration"}), 500
 
 
@@ -820,7 +1426,6 @@ def reset_config():
 
         return jsonify({"success": True})
     except Exception as e:
-        print(f"Error resetting config: {e}")
         return jsonify({"error": "Failed to reset configuration"}), 500
 
 

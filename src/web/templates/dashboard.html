@@ -218,6 +218,84 @@
           font-size: 1.2rem;
         }
       }
+
+      /* Analytics-specific styles */
+      .analytics-summary-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .analytics-summary-card h5 {
+        margin-bottom: 10px;
+        font-weight: 600;
+      }
+
+      .analytics-summary-card .count {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .analytics-filters {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+
+      .analytics-table th {
+        background: #495057 !important;
+        color: white !important;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .analytics-table td {
+        vertical-align: middle;
+        font-size: 0.85rem;
+      }
+
+      .badge {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+      }
+
+      .table-danger {
+        background-color: #f8d7da !important;
+      }
+
+      .table-warning {
+        background-color: #fff3cd !important;
+      }
+
+      .analytics-help {
+        background: #e7f3ff;
+        border: 1px solid #b3d9ff;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+      }
+
+      .analytics-help h6 {
+        color: #0066cc;
+        margin-bottom: 10px;
+      }
+
+      .analytics-help ul {
+        margin-bottom: 0;
+        padding-left: 20px;
+      }
+
+      .analytics-help li {
+        margin-bottom: 5px;
+        color: #495057;
+      }
     </style>
   </head>
   <body>
@@ -309,6 +387,18 @@
             role="tab"
           >
             <i class="fas fa-clipboard-list me-1"></i> Draft Board
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button
+            class="nav-link"
+            id="nfl-analytics-tab"
+            data-bs-toggle="tab"
+            data-bs-target="#nfl-analytics"
+            type="button"
+            role="tab"
+          >
+            <i class="fas fa-chart-line me-1"></i> NFL Analytics
           </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -1366,6 +1456,182 @@
           </div>
         </div>
       </div>
+
+      <!-- NFL Analytics Tab -->
+      <div class="tab-pane fade" id="nfl-analytics" role="tabpanel">
+        <div class="container-fluid">
+          <div class="row mb-4">
+            <div class="col-12">
+              <h3 class="mb-3">
+                <i class="fas fa-chart-line me-2"></i>NFL Analytics Dashboard
+              </h3>
+              <p class="text-muted">
+                Advanced NFL statistics and analytics to enhance your draft
+                decisions
+              </p>
+              <div class="alert alert-info" role="alert">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Data Source Notice:</strong> This dashboard attempts to
+                fetch real NFL historical data. If real data is unavailable,
+                enhanced mock analytics are used as fallback.
+              </div>
+            </div>
+          </div>
+
+          <!-- Analytics Filters -->
+          <div class="row mb-4 analytics-filters">
+            <div class="col-md-3">
+              <select class="form-select" id="analyticsPositionFilter">
+                <option value="all">All Positions</option>
+                <option value="QB">Quarterbacks</option>
+                <option value="RB">Running Backs</option>
+                <option value="WR">Wide Receivers</option>
+                <option value="TE">Tight Ends</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <select class="form-select" id="analyticsMetricFilter">
+                <option value="consistency">Consistency Score</option>
+                <option value="upside">Upside Potential</option>
+                <option value="risk">Risk Factor</option>
+                <option value="trend">Trend Score</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <input
+                type="number"
+                class="form-control"
+                id="analyticsMinGames"
+                placeholder="Min Games Played"
+                min="0"
+                max="100"
+              />
+            </div>
+            <div class="col-md-3">
+              <button class="btn btn-primary w-100" onclick="filterAnalytics()">
+                <i class="fas fa-filter me-1"></i>Apply Filters
+              </button>
+            </div>
+          </div>
+
+          <!-- Analytics Table -->
+          <div class="row">
+            <div class="col-12">
+              <div class="table-responsive">
+                <table
+                  class="table table-striped analytics-table"
+                  id="analyticsTable"
+                >
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Player</th>
+                      <th>Position</th>
+                      <th>Proj Pts</th>
+                      <th>NFL Games</th>
+                      <th>Avg PPR</th>
+                      <th>Consistency</th>
+                      <th>Upside</th>
+                      <th>Risk</th>
+                      <th>Trend</th>
+                      <th>Adj Priority</th>
+                    </tr>
+                  </thead>
+                  <tbody id="analyticsTableBody">
+                    <!-- Analytics data will be populated here -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Analytics Summary Cards -->
+          <div class="row mt-4">
+            <div class="col-md-3">
+              <div class="card text-center analytics-summary-card">
+                <div class="card-body">
+                  <h5 class="card-title text-success">
+                    <i class="fas fa-check-circle"></i>
+                  </h5>
+                  <h6 class="card-subtitle mb-2 text-muted">
+                    Low Risk Players
+                  </h6>
+                  <p class="card-text count" id="lowRiskCount">0</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card text-center analytics-summary-card">
+                <div class="card-body">
+                  <h5 class="card-title text-warning">
+                    <i class="fas fa-chart-line"></i>
+                  </h5>
+                  <h6 class="card-subtitle mb-2 text-muted">High Upside</h6>
+                  <p class="card-text count" id="highUpsideCount">0</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card text-center analytics-summary-card">
+                <div class="card-body">
+                  <h5 class="card-title text-info">
+                    <i class="fas fa-balance-scale"></i>
+                  </h5>
+                  <h6 class="card-subtitle mb-2 text-muted">Consistent</h6>
+                  <p class="card-text count" id="consistentCount">0</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="card text-center analytics-summary-card">
+                <div class="card-body">
+                  <h5 class="card-title text-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                  </h5>
+                  <h6 class="card-subtitle mb-2 text-muted">High Risk</h6>
+                  <p class="card-text count" id="highRiskCount">0</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Analytics Help Section -->
+          <div class="row mt-4">
+            <div class="col-12">
+              <div class="analytics-help">
+                <h6>
+                  <i class="fas fa-info-circle me-2"></i>How NFL Analytics
+                  Affect Draft Priority
+                </h6>
+                <ul>
+                  <li>
+                    <strong>Consistency Score (0-100%):</strong> How reliable a
+                    player's performance is based on game-to-game variation
+                  </li>
+                  <li>
+                    <strong>Upside Potential (0-200%):</strong> Future
+                    performance potential based on career trajectory and age
+                  </li>
+                  <li>
+                    <strong>Risk Factor (0-100%):</strong> Injury and
+                    performance risk assessment
+                  </li>
+                  <li>
+                    <strong>Trend Score (-100% to +100%):</strong> Recent
+                    performance trend analysis
+                  </li>
+                  <li>
+                    <strong>NFL-Adjusted Priority:</strong> Final draft priority
+                    incorporating all NFL data using the formula: Base Points +
+                    (Consistency × 20) + (Upside × 15) - (Risk × 25) + (Trend ×
+                    10)
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Bootstrap JS -->
@@ -1376,32 +1642,30 @@
       let overallData = [];
       let positionData = { QB: [], RB: [], WR: [], TE: [] };
       let draftBoardData = [];
+      let nflAnalyticsData = [];
       let currentRound = 1;
       let currentPick = 1;
       let leagueConfig = { num_teams: 12 }; // Default to 12, will be updated from config
 
       // Load data on page load
       document.addEventListener("DOMContentLoaded", function () {
-        console.log("🚀 DOMContentLoaded fired");
         loadOverallData();
         loadPositionData();
         loadDraftBoardData();
+        // Note: loadNflAnalyticsData() is now called only when the NFL Analytics tab is activated
         setupSearch();
         loadConfig();
       });
 
       function loadOverallData() {
-        console.log("🔍 loadOverallData() called");
         fetch("/api/overall")
           .then((response) => {
-            console.log("📡 API response received:", response.status);
             if (!response.ok) {
               throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.json();
           })
           .then((data) => {
-            console.log(`✅ Loaded ${data.length} overall players`);
             overallData = data;
             renderOverallTable(data);
           })
@@ -1420,7 +1684,6 @@
               return response.json();
             })
             .then((data) => {
-              console.log(`Loaded ${data.length} ${pos} players`);
               positionData[pos] = data;
               renderPositionTable(pos, data);
             })
@@ -1439,13 +1702,290 @@
             return response.json();
           })
           .then((data) => {
-            console.log(`Loaded ${data.length} draft board players`);
             draftBoardData = data;
             renderDraftBoardTable(data);
           })
           .catch((error) =>
             console.error("Error loading draft board data:", error)
           );
+      }
+
+      function loadNflAnalyticsData() {
+        console.log("🔍 loadNflAnalyticsData() called");
+
+        // First check if elements exist
+        const tbody = document.getElementById("analyticsTableBody");
+        const table = document.getElementById("analyticsTable");
+        console.log("🔍 Pre-fetch check - tbody:", tbody, "table:", table);
+
+        fetch("/api/nfl_analytics")
+          .then((response) => {
+            console.log(
+              "📡 NFL Analytics API response:",
+              response.status,
+              response.statusText
+            );
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then((data) => {
+            console.log(`✅ Loaded ${data.length} NFL analytics players`);
+            nflAnalyticsData = data;
+
+            renderAnalyticsTable(data);
+            updateAnalyticsSummary(data);
+          })
+          .catch((error) => {
+            console.error("❌ Error loading NFL analytics data:", error);
+            // Fallback to basic analytics if NFL data fails
+            renderAnalyticsTable([]);
+            updateAnalyticsSummary([]);
+          });
+      }
+
+      function renderAnalyticsTable(data) {
+        const tbody = document.getElementById("analyticsTableBody");
+
+        if (!tbody) {
+          console.error("❌ Analytics table body element not found");
+          return;
+        }
+
+        tbody.innerHTML = "";
+
+        if (!data || data.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="11" class="text-center text-muted">
+                <i class="fas fa-chart-line me-2"></i>
+                NFL Analytics data not available. Using basic projections.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        // Add visible confirmation that rendering started
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="11" class="text-center text-info">
+              <i class="fas fa-spinner fa-spin me-2"></i>
+              Rendering ${data.length} players...
+            </td>
+          </tr>
+        `;
+
+        // Use setTimeout to ensure the loading message appears
+        setTimeout(() => {
+          tbody.innerHTML = ""; // Clear loading message
+
+          data.forEach((player, index) => {
+            console.log(
+              `🔸 Rendering player ${index + 1}: ${player.player || "Unknown"}`
+            );
+            const row = document.createElement("tr");
+
+            // Add tier-based styling
+            if (player.Tier) {
+              row.classList.add(`tier-${player.Tier}`);
+            }
+
+            // Add risk-based styling
+            const riskScore = player.nfl_risk_factor || 0;
+            if (riskScore > 0.7) {
+              row.classList.add("table-danger");
+            } else if (riskScore > 0.5) {
+              row.classList.add("table-warning");
+            }
+
+            row.innerHTML = `
+            <td>${player.Rank || index + 1}</td>
+            <td>
+              <strong>${player.player || "Unknown"}</strong>
+              ${
+                player.drafted
+                  ? '<span class="badge bg-secondary ms-1">Drafted</span>'
+                  : ""
+              }
+            </td>
+            <td><span class="position-badge ${player.position?.toLowerCase()}-badge">${
+              player.position || "N/A"
+            }</span></td>
+            <td>${player.points ? player.points.toFixed(1) : "0.0"}</td>
+            <td>${player.nfl_games_played || 0}</td>
+            <td>${
+              player.nfl_avg_ppr_points
+                ? player.nfl_avg_ppr_points.toFixed(1)
+                : "N/A"
+            }</td>
+            <td>
+              <span class="badge ${getConsistencyBadgeClass(
+                player.nfl_consistency_score
+              )}">
+                ${
+                  player.nfl_consistency_score
+                    ? (player.nfl_consistency_score * 100).toFixed(0) + "%"
+                    : "N/A"
+                }
+              </span>
+            </td>
+            <td>
+              <span class="badge ${getUpsideBadgeClass(
+                player.nfl_upside_potential
+              )}">
+                ${
+                  player.nfl_upside_potential
+                    ? (player.nfl_upside_potential * 100).toFixed(0) + "%"
+                    : "N/A"
+                }
+              </span>
+            </td>
+            <td>
+              <span class="badge ${getRiskBadgeClass(player.nfl_risk_factor)}">
+                ${
+                  player.nfl_risk_factor
+                    ? (player.nfl_risk_factor * 100).toFixed(0) + "%"
+                    : "N/A"
+                }
+              </span>
+            </td>
+            <td>
+              <span class="badge ${getTrendBadgeClass(player.nfl_trend_score)}">
+                ${
+                  player.nfl_trend_score
+                    ? (player.nfl_trend_score * 100).toFixed(1) + "%"
+                    : "N/A"
+                }
+              </span>
+            </td>
+            <td><strong>${
+              player.nfl_adjusted_priority
+                ? player.nfl_adjusted_priority.toFixed(1)
+                : "N/A"
+            }</strong></td>
+          `;
+
+            tbody.appendChild(row);
+          });
+        }, 10); // Close setTimeout
+      }
+
+      function updateAnalyticsSummary(data) {
+        if (!data || data.length === 0) {
+          document.getElementById("lowRiskCount").textContent = "0";
+          document.getElementById("highUpsideCount").textContent = "0";
+          document.getElementById("consistentCount").textContent = "0";
+          document.getElementById("highRiskCount").textContent = "0";
+          return;
+        }
+
+        const lowRisk = data.filter(
+          (p) => (p.nfl_risk_factor || 0) <= 0.3
+        ).length;
+        const highUpside = data.filter(
+          (p) => (p.nfl_upside_potential || 0) >= 1.2
+        ).length;
+        const consistent = data.filter(
+          (p) => (p.nfl_consistency_score || 0) >= 0.7
+        ).length;
+        const highRisk = data.filter(
+          (p) => (p.nfl_risk_factor || 0) >= 0.7
+        ).length;
+
+        document.getElementById("lowRiskCount").textContent = lowRisk;
+        document.getElementById("highUpsideCount").textContent = highUpside;
+        document.getElementById("consistentCount").textContent = consistent;
+        document.getElementById("highRiskCount").textContent = highRisk;
+      }
+
+      function getConsistencyBadgeClass(score) {
+        if (!score) return "bg-secondary";
+        if (score >= 0.8) return "bg-success";
+        if (score >= 0.6) return "bg-info";
+        if (score >= 0.4) return "bg-warning";
+        return "bg-danger";
+      }
+
+      function getUpsideBadgeClass(score) {
+        if (!score) return "bg-secondary";
+        if (score >= 1.5) return "bg-success";
+        if (score >= 1.2) return "bg-info";
+        if (score >= 1.0) return "bg-warning";
+        return "bg-danger";
+      }
+
+      function getRiskBadgeClass(score) {
+        if (!score) return "bg-secondary";
+        if (score <= 0.3) return "bg-success";
+        if (score <= 0.5) return "bg-info";
+        if (score <= 0.7) return "bg-warning";
+        return "bg-danger";
+      }
+
+      function getTrendBadgeClass(score) {
+        if (!score) return "bg-secondary";
+        if (score > 0.1) return "bg-success";
+        if (score > -0.1) return "bg-info";
+        if (score > -0.2) return "bg-warning";
+        return "bg-danger";
+      }
+
+      function filterAnalytics() {
+        const positionFilter = document.getElementById(
+          "analyticsPositionFilter"
+        ).value;
+        const metricFilter = document.getElementById(
+          "analyticsMetricFilter"
+        ).value;
+        const minGames =
+          parseInt(document.getElementById("analyticsMinGames").value) || 0;
+
+        let filteredData = [...nflAnalyticsData];
+
+        // Filter by position
+        if (positionFilter !== "all") {
+          filteredData = filteredData.filter(
+            (p) => p.position === positionFilter
+          );
+        }
+
+        // Filter by minimum games
+        if (minGames > 0) {
+          filteredData = filteredData.filter(
+            (p) => (p.nfl_games_played || 0) >= minGames
+          );
+        }
+
+        // Sort by selected metric
+        switch (metricFilter) {
+          case "consistency":
+            filteredData.sort(
+              (a, b) =>
+                (b.nfl_consistency_score || 0) - (a.nfl_consistency_score || 0)
+            );
+            break;
+          case "upside":
+            filteredData.sort(
+              (a, b) =>
+                (b.nfl_upside_potential || 0) - (a.nfl_upside_potential || 0)
+            );
+            break;
+          case "risk":
+            filteredData.sort(
+              (a, b) => (a.nfl_risk_factor || 0) - (b.nfl_risk_factor || 0)
+            );
+            break;
+          case "trend":
+            filteredData.sort(
+              (a, b) => (b.nfl_trend_score || 0) - (a.nfl_trend_score || 0)
+            );
+            break;
+        }
+
+        renderAnalyticsTable(filteredData);
+        updateAnalyticsSummary(filteredData);
       }
 
       function renderOverallTable(data) {
@@ -2202,6 +2742,97 @@
             });
         }
       }
+
+      // Analytics event listeners
+      document
+        .getElementById("analyticsPositionFilter")
+        .addEventListener("change", filterAnalytics);
+      document
+        .getElementById("analyticsMetricFilter")
+        .addEventListener("change", filterAnalytics);
+      document
+        .getElementById("analyticsMinGames")
+        .addEventListener("input", filterAnalytics);
+
+      // Add click listener to NFL Analytics tab
+      const nflAnalyticsTab = document.getElementById("nfl-analytics-tab");
+      if (nflAnalyticsTab) {
+        nflAnalyticsTab.addEventListener("click", function (e) {
+          e.preventDefault(); // Prevent default Bootstrap behavior
+          switchToNFLAnalyticsTab(); // Use our manual switching function
+        });
+      }
+
+      // Manual tab switching function
+      function switchToNFLAnalyticsTab() {
+        console.log("🔄 Manually switching to NFL Analytics tab");
+
+        // Deactivate all tab buttons
+        document.querySelectorAll(".nav-link").forEach((btn) => {
+          btn.classList.remove("active");
+        });
+
+        // Activate NFL Analytics tab button
+        const nflAnalyticsTabBtn = document.getElementById("nfl-analytics-tab");
+        if (nflAnalyticsTabBtn) {
+          nflAnalyticsTabBtn.classList.add("active");
+        }
+
+        // Deactivate all tab panes
+        document.querySelectorAll(".tab-pane").forEach((pane) => {
+          pane.classList.remove("active", "show");
+        });
+
+        // Activate NFL Analytics tab pane
+        const nflAnalyticsPane = document.getElementById("nfl-analytics");
+        if (nflAnalyticsPane) {
+          nflAnalyticsPane.classList.add("active", "show");
+          console.log("🎯 NFL Analytics tab pane is now active");
+        }
+
+        // Load data
+        setTimeout(() => {
+          if (nflAnalyticsData.length === 0) {
+            loadNflAnalyticsData();
+          } else {
+            renderAnalyticsTable(nflAnalyticsData);
+            updateAnalyticsSummary(nflAnalyticsData);
+          }
+        }, 100);
+      }
+
+      // Tab event listeners
+      document
+        .querySelectorAll('button[data-bs-toggle="tab"]')
+        .forEach((tab) => {
+          tab.addEventListener("shown.bs.tab", (event) => {
+            const targetTab = event.target.getAttribute("data-bs-target");
+            console.log("📑 Tab shown:", targetTab);
+
+            if (targetTab === "#nfl-analytics") {
+              console.log("🎯 NFL Analytics tab activated");
+              // Load analytics data only when the tab is activated
+              if (nflAnalyticsData.length === 0) {
+                loadNflAnalyticsData();
+              } else {
+                // Data already loaded, just render it
+                renderAnalyticsTable(nflAnalyticsData);
+                updateAnalyticsSummary(nflAnalyticsData);
+              }
+            } else {
+              // Clear analytics table when switching away from NFL Analytics tab
+              console.log("� Switching away from NFL Analytics tab");
+              const tbody = document.getElementById("analyticsTableBody");
+              if (tbody) {
+                tbody.innerHTML = "";
+              }
+            }
+
+            if (targetTab === "#draft-board") {
+              loadDraftBoardData();
+            }
+          });
+        });
     </script>
   </body>
 </html>
