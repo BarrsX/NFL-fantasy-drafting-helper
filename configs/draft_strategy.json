@@ -1,0 +1,272 @@
+{
+    "draft_strategy_2025": {
+        "description": "2025 Dynasty Superflex Draft Strategy - Statistical Thresholds",
+        "round_bonuses": {
+            "rounds_1_2": {
+                "description": "Elite tier - Top franchise players",
+                "bonus": 50,
+                "criteria": {
+                    "WR": {
+                        "min_vorp": 50,
+                        "max_rank": 5,
+                        "description": "Elite WR1s with elite ceiling"
+                    },
+                    "QB": {
+                        "min_vorp": 80,
+                        "max_rank": 3,
+                        "description": "Elite QBs in superflex"
+                    },
+                    "RB": {
+                        "min_vorp": 70,
+                        "max_rank": 3,
+                        "description": "Elite RB1s with massive workload"
+                    }
+                }
+            },
+            "round_3": {
+                "description": "Premium players with high floors",
+                "bonus": 40,
+                "criteria": {
+                    "RB": {
+                        "min_vorp": 60,
+                        "max_rank": 8,
+                        "description": "High-end RB1s"
+                    },
+                    "DL": {
+                        "min_vorp": 50,
+                        "max_rank": 3,
+                        "description": "Elite pass rushers"
+                    },
+                    "QB": {
+                        "min_vorp": 70,
+                        "max_rank": 6,
+                        "description": "Solid QB1s"
+                    }
+                }
+            },
+            "rounds_4_5": {
+                "description": "Anchor players and strong starters",
+                "bonus": 35,
+                "criteria": {
+                    "DL": {
+                        "min_vorp": 20,
+                        "max_pos_rank": 8,
+                        "description": "IDP anchors - pass rush specialists"
+                    },
+                    "LB": {
+                        "min_vorp": 15,
+                        "max_pos_rank": 6,
+                        "description": "IDP anchors - tackle machines"
+                    },
+                    "QB": {
+                        "min_vorp": 50,
+                        "max_rank": 12,
+                        "description": "QB1s with upside"
+                    },
+                    "RB": {
+                        "min_vorp": 30,
+                        "max_rank": 15,
+                        "description": "RB1/2 borderline players"
+                    },
+                    "WR": {
+                        "min_vorp": 30,
+                        "max_rank": 15,
+                        "description": "WR1/2 borderline players"
+                    },
+                    "TE": {
+                        "min_vorp": 25,
+                        "max_pos_rank": 3,
+                        "description": "Elite TEs"
+                    }
+                }
+            },
+            "rounds_6_7": {
+                "description": "Upside plays and depth starters",
+                "bonus": 20,
+                "criteria": {
+                    "QB": {
+                        "min_vorp": 30,
+                        "max_rank": 18,
+                        "description": "QB2s with QB1 upside"
+                    },
+                    "RB": {
+                        "min_vorp": 15,
+                        "max_rank": 25,
+                        "description": "RB2s and handcuffs with upside"
+                    },
+                    "WR": {
+                        "min_vorp": 15,
+                        "max_rank": 25,
+                        "description": "WR2s and breakout candidates"
+                    },
+                    "TE": {
+                        "min_vorp": 10,
+                        "max_pos_rank": 8,
+                        "description": "Solid TE options"
+                    }
+                }
+            },
+            "rounds_8_plus": {
+                "description": "Depth, IDP fillers, and lottery tickets",
+                "bonus": 12,
+                "criteria": {
+                    "DL": {
+                        "min_vorp": -10,
+                        "description": "IDP depth - consistent producers"
+                    },
+                    "LB": {
+                        "min_vorp": -10,
+                        "description": "IDP depth - tackle volume"
+                    },
+                    "DB": {
+                        "min_vorp": -10,
+                        "description": "IDP depth - big play potential"
+                    },
+                    "QB": {
+                        "min_vorp": 10,
+                        "max_rank": 30,
+                        "description": "QB2s and streaming options"
+                    },
+                    "RB": {
+                        "min_vorp": -5,
+                        "max_rank": 50,
+                        "description": "Depth RBs and handcuffs"
+                    },
+                    "WR": {
+                        "min_vorp": -5,
+                        "max_rank": 50,
+                        "description": "Depth WRs and stashes"
+                    },
+                    "TE": {
+                        "min_vorp": -5,
+                        "max_pos_rank": 20,
+                        "description": "TE depth and streamers"
+                    },
+                    "K": {
+                        "min_vorp": -20,
+                        "description": "Kickers if required"
+                    },
+                    "DST": {
+                        "min_vorp": -20,
+                        "description": "Defenses if required"
+                    }
+                }
+            }
+        }
+    },
+    "draft_strategy_conservative": {
+        "description": "Conservative approach focusing on floor over ceiling",
+        "round_bonuses": {
+            "rounds_1_2": {
+                "bonus": 40,
+                "criteria": {
+                    "WR": {
+                        "min_vorp": 45,
+                        "max_rank": 8
+                    },
+                    "QB": {
+                        "min_vorp": 70,
+                        "max_rank": 5
+                    },
+                    "RB": {
+                        "min_vorp": 60,
+                        "max_rank": 5
+                    }
+                }
+            },
+            "round_3": {
+                "bonus": 30,
+                "criteria": {
+                    "RB": {
+                        "min_vorp": 40,
+                        "max_rank": 12
+                    },
+                    "WR": {
+                        "min_vorp": 35,
+                        "max_rank": 12
+                    },
+                    "TE": {
+                        "min_vorp": 20,
+                        "max_pos_rank": 3
+                    }
+                }
+            },
+            "rounds_4_5": {
+                "bonus": 25,
+                "criteria": {
+                    "QB": {
+                        "min_vorp": 40,
+                        "max_rank": 15
+                    },
+                    "RB": {
+                        "min_vorp": 20,
+                        "max_rank": 20
+                    },
+                    "WR": {
+                        "min_vorp": 20,
+                        "max_rank": 20
+                    },
+                    "DL": {
+                        "min_vorp": 15,
+                        "max_pos_rank": 10
+                    },
+                    "LB": {
+                        "min_vorp": 10,
+                        "max_pos_rank": 8
+                    }
+                }
+            },
+            "rounds_6_7": {
+                "bonus": 15,
+                "criteria": {
+                    "QB": {
+                        "min_vorp": 20,
+                        "max_rank": 25
+                    },
+                    "RB": {
+                        "min_vorp": 5,
+                        "max_rank": 35
+                    },
+                    "WR": {
+                        "min_vorp": 5,
+                        "max_rank": 35
+                    },
+                    "TE": {
+                        "min_vorp": 5,
+                        "max_pos_rank": 12
+                    }
+                }
+            },
+            "rounds_8_plus": {
+                "bonus": 8,
+                "criteria": {
+                    "DL": {
+                        "min_vorp": -15
+                    },
+                    "LB": {
+                        "min_vorp": -15
+                    },
+                    "DB": {
+                        "min_vorp": -15
+                    },
+                    "QB": {
+                        "min_vorp": 5,
+                        "max_rank": 35
+                    },
+                    "RB": {
+                        "min_vorp": -10,
+                        "max_rank": 60
+                    },
+                    "WR": {
+                        "min_vorp": -10,
+                        "max_rank": 60
+                    },
+                    "TE": {
+                        "min_vorp": -10,
+                        "max_pos_rank": 25
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,72 @@
+' CORRECTED VBA Macro for Fantasy Football Draft Sheet
+' =====================================================
+' IMPORTANT: This code must be placed in the WORKSHEET MODULE, not a regular module!
+'
+' How to add correctly:
+' 1. Open your Excel file
+' 2. Press Alt+F11 to open VBA editor
+' 3. In the Project Explorer (left panel), find your workbook
+' 4. Expand it and find "Microsoft Excel Objects"
+' 5. Double-click on "Draft Board" (the sheet name)
+' 6. Paste this code in the code window that opens
+' 7. Save and close VBA editor
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    On Error Resume Next ' Prevent errors from stopping the macro
+
+    ' Only process changes in the Drafted column (Column I = 9)
+    If Target.Column = 9 Then
+
+        Application.EnableEvents = False ' Prevent infinite loop
+
+        If LCase(Trim(Target.Value)) = "x" Then
+            ' Apply strikethrough to the row (columns A-H)
+            With Me.Rows(Target.Row)
+                .Range("A:H").Font.Strikethrough = True
+                .Range("A:H").Font.Color = RGB(128, 128, 128) ' Gray text
+            End With
+        ElseIf Target.Value = "" Then
+            ' Remove strikethrough if cell is cleared
+            With Me.Rows(Target.Row)
+                .Range("A:H").Font.Strikethrough = False
+                .Range("A:H").Font.Color = RGB(0, 0, 0) ' Black text
+            End With
+        End If
+
+        Application.EnableEvents = True
+    End If
+End Sub
+
+' =================================================================
+' ALTERNATIVE: If the above doesn't work, try this simpler version:
+' =================================================================
+
+Private Sub Worksheet_Change(ByVal Target As Range)
+    If Target.Column = 9 And Target.Value = "X" Then
+        Target.EntireRow.Range("A:H").Font.Strikethrough = True
+        Target.EntireRow.Range("A:H").Font.Color = vbGrayText
+    ElseIf Target.Column = 9 And Target.Value = "" Then
+        Target.EntireRow.Range("A:H").Font.Strikethrough = False
+        Target.EntireRow.Range("A:H").Font.Color = vbBlack
+    End If
+End Sub
+
+' QUICKEST SOLUTION: Conditional Formatting (No VBA Required!)
+' ================================================================
+' This is MUCH easier than VBA and works in all Excel versions
+'
+' Steps:
+' 1. Open your Excel file
+' 2. Go to the "Draft Board" sheet
+' 3. Select the entire sheet (Ctrl+A) or just columns A:H
+' 4. Go to Home > Conditional Formatting > New Rule
+' 5. Select "Use a formula to determine which cells to format"
+' 6. Enter this formula: =$I2="X"
+' 7. Click "Format" button
+' 8. Go to Font tab, check "Strikethrough"
+' 9. Optional: Change color to gray (Color dropdown)
+' 10. Click OK twice
+'
+' That's it! Now any row with "X" in column I will be crossed out automatically.
+'
+' To apply to more rows, make sure the "Applies to" range includes all your data rows.

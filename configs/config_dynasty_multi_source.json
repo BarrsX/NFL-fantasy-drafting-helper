@@ -1,0 +1,96 @@
+{
+    "multi_source_dynasty": {
+        "paths": {
+            "adp_csv": "D:/Coding/fantasy drafting/data/sleeper_adp.csv",
+            "offense_sources": [
+                {
+                    "name": "2025_Projections",
+                    "path": "D:/Coding/fantasy drafting/data/projections_2025_offense_only.csv",
+                    "weight": 0.50
+                },
+                {
+                    "name": "WR_Rankings",
+                    "path": "D:/Coding/fantasy drafting/data/fantasy2025rankingsexcel.csv",
+                    "weight": 0.25
+                },
+                {
+                    "name": "Primary",
+                    "path": "D:/Coding/fantasy drafting/data/offense_projections.csv",
+                    "weight": 0.25
+                }
+            ],
+            "idp_csv": "D:/Coding/fantasy drafting/data/idp_projections.csv",
+            "output_xlsx": "D:/Coding/fantasy drafting/output/dynasty_multi_source_cheatsheet.xlsx"
+        },
+        "consensus": {
+            "method": "weighted_average",
+            "min_sources": 1,
+            "outlier_threshold": 2.0
+        },
+        "league": {
+            "use_idp": true,
+            "superflex": true,
+            "num_teams": 10,
+            "starters": {
+                "QB": 1,
+                "RB": 2,
+                "WR": 3,
+                "TE": 1,
+                "FLEX": 2,
+                "DL": 1,
+                "LB": 2,
+                "DB": 1,
+                "IDP_FLEX": 1
+            },
+            "superflex_qb_per_team": 1.0,
+            "bench_factor": {
+                "QB": 1.5,
+                "RB": 0.7,
+                "WR": 0.8,
+                "TE": 0.5,
+                "DL": 0.5,
+                "LB": 0.6,
+                "DB": 0.5
+            }
+        },
+        "tiers": {
+            "tier_gap_points": {
+                "QB": 12.0,
+                "RB": 4.0,
+                "WR": 4.0,
+                "TE": 4.0,
+                "FLEX": 4.0,
+                "DL": 3.0,
+                "LB": 3.0,
+                "DB": 3.0
+            }
+        },
+        "scoring": {
+            "offense": {
+                "pass_yd": 0.04,
+                "pass_td": 4.0,
+                "pass_int": -2.0,
+                "rush_yd": 0.1,
+                "rush_td": 6.0,
+                "rec": 1.0,
+                "rec_yd": 0.1,
+                "rec_td": 6.0,
+                "fumble": -2.0
+            },
+            "idp": {
+                "tackle": 1.0,
+                "assist": 0.5,
+                "sack": 4.0,
+                "int": 6.0,
+                "fumble_rec": 4.0,
+                "pass_def": 2.0,
+                "td": 6.0,
+                "safety": 2.0,
+                "block": 4.0
+            }
+        },
+        "strategy": {
+            "draft_strategy_file": "D:/Coding/fantasy drafting/configs/draft_strategy.json"
+        }
+    }
+}

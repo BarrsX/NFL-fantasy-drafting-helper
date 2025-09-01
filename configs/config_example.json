@@ -1,0 +1,101 @@
+{
+    "custom_example": {
+        "paths": {
+            "adp_csv": "../data/sleeper_adp.csv",
+            "offense_csv": "../data/offense_projections.csv",
+            "idp_csv": "../data/idp_projections.csv",
+            "output_xlsx": "../output/custom_example_cheatsheet.xlsx"
+        },
+        "league": {
+            "use_idp": true,
+            "superflex": true,
+            "num_teams": 12,
+            "starters": {
+                "QB": 1,
+                "RB": 2,
+                "WR": 3,
+                "TE": 1,
+                "DL": 2,
+                "LB": 2,
+                "DB": 2,
+                "FLEX": 1
+            },
+            "superflex_qb_per_team": 1.5,
+            "bench_factor": {
+                "QB": 0.4,
+                "RB": 0.8,
+                "WR": 1.0,
+                "TE": 0.6,
+                "DL": 0.5,
+                "LB": 0.7,
+                "DB": 0.5
+            }
+        },
+        "tiers": {
+            "tier_gap_points": {
+                "QB": 15.0,
+                "RB": 12.0,
+                "WR": 10.0,
+                "TE": 8.0,
+                "DL": 5.0,
+                "LB": 6.0,
+                "DB": 4.0,
+                "FLEX": 10.0
+            }
+        },
+        "scoring": {
+            "offense": {
+                "pass_yd": 0.04,
+                "pass_td": 6.0,
+                "pass_int": -2.0,
+                "pass_2pt": 2.0,
+                "rush_yd": 0.1,
+                "rush_td": 6.0,
+                "rush_2pt": 2.0,
+                "rec": 1.0,
+                "rec_yd": 0.1,
+                "rec_td": 6.0,
+                "rec_2pt": 2.0,
+                "first_down_rb": 0.25,
+                "first_down_wr": 0.25,
+                "first_down_te": 0.25,
+                "first_down_qb": 0.0,
+                "bonus_25_plus_completions": 2.0,
+                "bonus_20_plus_carries": 1.0,
+                "rec_10_19_bonus": 0.0,
+                "rec_20_29_bonus": 0.5,
+                "rec_30_39_bonus": 1.0,
+                "rec_40_plus_bonus": 1.5,
+                "rec_40_plus_td_bonus": 2.0,
+                "rec_50_plus_td_bonus": 3.0,
+                "bonus_100_199_rush_game": 3.0,
+                "bonus_200_plus_rush_game": 5.0,
+                "bonus_100_199_rec_game": 3.0,
+                "bonus_200_plus_rec_game": 5.0,
+                "bonus_100_199_combo_game": 4.0,
+                "bonus_200_plus_combo_game": 6.0,
+                "bonus_300_399_pass_game": 5.0,
+                "bonus_400_plus_pass_game": 8.0
+            },
+            "idp": {
+                "tackle_solo": 1.5,
+                "tackle_ast": 0.75,
+                "sack": 4.0,
+                "int": 3.0,
+                "ff": 2.0,
+                "fr": 3.0,
+                "def_td": 6.0,
+                "pd": 1.5,
+                "safety": 3.0,
+                "blk": 3.0
+            }
+        },
+        "sleeper_api": {
+            "use_api": false,
+            "season": 2025,
+            "scoring": "ppr",
+            "season_type": "regular",
+            "source_url": "https://api.sleeper.app/v1/adp/players/{season}?season_type={stype}&scoring={scoring}"
+        }
+    }
+}
