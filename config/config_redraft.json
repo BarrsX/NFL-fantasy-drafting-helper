@@ -1,0 +1,128 @@
+{
+  "redraft_12team": {
+    "paths": {
+      "adp_csv": "../../data/sleeper_adp.csv",
+      "offense_sources": [
+        {
+          "name": "Primary",
+          "path": "D:/Coding/fantasy drafting/data/offense_projections.csv",
+          "weight": 0.6
+        },
+        {
+          "name": "WR_Rankings",
+          "path": "D:/Coding/fantasy drafting/data/fantasy2025rankingsexcel.csv",
+          "weight": 0.3
+        },
+        {
+          "name": "2025_Projections",
+          "path": "D:/Coding/fantasy drafting/data/projections_2025_offense_only.csv",
+          "weight": 0.1
+        }
+      ],
+      "idp_csv": "../../data/idp_projections.csv",
+      "output_xlsx": "../../output/redraft_12team_cheatsheet.xlsx"
+    },
+    "consensus": {
+      "method": "weighted_average",
+      "min_sources": 1,
+      "outlier_threshold": 2.0
+    },
+    "league": {
+      "num_teams": 2,
+      "superflex": true,
+      "starters": {
+        "QB": 1,
+        "RB": 2,
+        "WR": 2,
+        "TE": 1,
+        "FLEX": 1,
+        "SUPERFLEX": 1
+      }
+    },
+    "tiers": {
+      "tier_gap_points": {
+        "QB": 18.0,
+        "RB": 12.0,
+        "WR": 12.0,
+        "TE": 10.0,
+        "FLEX": 12.0,
+        "SUPERFLEX": 15.0
+      }
+    },
+    "scoring": {
+      "offense": {
+        "pass_yd": 0.04,
+        "pass_td": 4,
+        "pass_int": -2,
+        "pass_2pt": 2,
+        "rush_yd": 0.1,
+        "rush_td": 6,
+        "rush_2pt": 2,
+        "rec": 1,
+        "rec_yd": 0.1,
+        "rec_td": 6,
+        "rec_2pt": 2
+      },
+      "kicking": {
+        "fg_0_19": 3,
+        "fg_20_29": 3,
+        "fg_30_39": 3,
+        "fg_40_49": 4,
+        "fg_50_59": 5,
+        "fg_60_plus": 6,
+        "pat_made": 1,
+        "fg_missed": -1,
+        "pat_missed": -1
+      },
+      "defense": {
+        "def_td": 6,
+        "pts_allowed_0": 5,
+        "pts_allowed_1_6": 4,
+        "pts_allowed_7_13": 3,
+        "pts_allowed_14_20": 1,
+        "pts_allowed_28_34": -1,
+        "pts_allowed_35_plus": -4,
+        "yds_allowed_lt_100": 5,
+        "yds_allowed_100_199": 3,
+        "yds_allowed_200_299": 2,
+        "yds_allowed_350_399": -1,
+        "yds_allowed_400_449": -3,
+        "yds_allowed_450_499": -5,
+        "yds_allowed_500_549": -6,
+        "yds_allowed_550_plus": -7,
+        "sack": 1,
+        "interception": 2,
+        "fum_rec": 2,
+        "safety": 2,
+        "forced_fum": 1,
+        "blocked_kick": 2
+      },
+      "special_teams_def": {
+        "st_def_td": 6,
+        "st_def_forced_fum": 1,
+        "st_def_fum_rec": 1
+      },
+      "special_teams_player": {
+        "st_player_td": 6,
+        "st_player_forced_fum": 1,
+        "st_player_fum_rec": 1
+      },
+      "misc": {
+        "fum_lost": -2,
+        "fum_rec_td": 6
+      }
+    },
+    "sleeper_api": {
+      "use_api": false,
+      "season": 2025,
+      "scoring": "ppr",
+      "season_type": "regular",
+      "source_url": "https://api.sleeper.app/v1/adp/players/{season}?season_type={stype}&scoring={scoring}"
+    },
+    "nfl_data": {
+      "enabled": true,
+      "confidence_weight": 0.1,
+      "max_boost_percent": 10.0
+    }
+  }
+}

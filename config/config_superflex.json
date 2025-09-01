@@ -94,13 +94,11 @@
                 "pts_allowed_1_6": 4.0,
                 "pts_allowed_7_13": 3.0,
                 "pts_allowed_14_20": 1.0,
-                "pts_allowed_21_27": 0.0,
                 "pts_allowed_28_34": -1.0,
                 "pts_allowed_35_plus": -4.0,
-                "yds_allowed_under_100": 5.0,
+                "yds_allowed_lt_100": 5.0,
                 "yds_allowed_100_199": 3.0,
                 "yds_allowed_200_299": 2.0,
-                "yds_allowed_300_349": 0.0,
                 "yds_allowed_350_399": -1.0,
                 "yds_allowed_400_449": -3.0,
                 "yds_allowed_450_499": -5.0,
@@ -108,18 +106,24 @@
                 "yds_allowed_550_plus": -7.0,
                 "sack": 1.0,
                 "interception": 2.0,
-                "fumble_recovery": 2.0,
+                "fum_rec": 2.0,
                 "safety": 2.0,
-                "forced_fumble": 1.0,
+                "forced_fum": 1.0,
                 "blocked_kick": 2.0
             },
-            "special_teams": {
-                "st_td": 6.0,
-                "st_forced_fumble": 1.0,
-                "st_fumble_recovery": 1.0,
+            "special_teams_def": {
+                "st_def_td": 6.0,
+                "st_def_forced_fum": 1.0,
+                "st_def_fum_rec": 1.0
+            },
+            "special_teams_player": {
                 "st_player_td": 6.0,
-                "st_player_forced_fumble": 1.0,
-                "st_player_fumble_recovery": 1.0
+                "st_player_forced_fum": 1.0,
+                "st_player_fum_rec": 1.0
+            },
+            "misc": {
+                "fum_lost": -2.0,
+                "fum_rec_td": 6.0
             }
         },
         "sleeper_api": {

@@ -60,10 +60,10 @@ CONFIG_PROFILE = "redraft_12team"  # Profile name within the config file
 
 # Quick config presets (uncomment the one you want to use):
 # CONFIG_FILE, CONFIG_PROFILE = "list", "all"                     # List all configs
-# CONFIG_FILE, CONFIG_PROFILE = "../configs/config.json", "default"           # Standard league
-# CONFIG_FILE, CONFIG_PROFILE = "../configs/config_redraft.json", "redraft_12team"   # Redraft league
-# CONFIG_FILE, CONFIG_PROFILE = "../configs/config_dynasty.json", "superflex_dynasty"   # Dynasty league
-# CONFIG_FILE, CONFIG_PROFILE = "../configs/config_superflex.json", "superflex_12team"  # Superflex league
+# CONFIG_FILE, CONFIG_PROFILE = "../../config/config.json", "default"           # Standard league
+# CONFIG_FILE, CONFIG_PROFILE = "../../config/config_redraft.json", "redraft_12team"   # Redraft league
+# CONFIG_FILE, CONFIG_PROFILE = "../../config/config_dynasty.json", "superflex_dynasty"   # Dynasty league
+# CONFIG_FILE, CONFIG_PROFILE = "../../config/config_superflex.json", "superflex_12team"  # Superflex league
 # =============================================================================
 
 try:
