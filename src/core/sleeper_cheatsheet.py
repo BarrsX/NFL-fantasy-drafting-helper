@@ -1665,86 +1665,8 @@ def main(
     else:
         pool = off.copy()
 
-    # Optional: Integrate NFL data for enhanced rankings
-    nfl_data_config = cfg.get("nfl_data", {})
-    use_nfl_data = nfl_data_config.get("enabled", False)
-
-    # Robust boolean conversion - handle pandas Series, numpy arrays, etc.
-    if hasattr(use_nfl_data, "__len__") and not isinstance(use_nfl_data, str):
-        # It's array-like (Series, ndarray, etc.)
-        try:
-            use_nfl_data = (
-                bool(use_nfl_data.iloc[0])
-                if hasattr(use_nfl_data, "iloc") and len(use_nfl_data) > 0
-                else False
-            )
-        except (AttributeError, IndexError, TypeError):
-            use_nfl_data = bool(use_nfl_data) if len(use_nfl_data) > 0 else False
-    else:
-        # It's a scalar value
-        use_nfl_data = bool(use_nfl_data)
-
-    if use_nfl_data:
-        try:
-            import sys
-
-            # Add the scripts/core directory to the path
-            core_path = os.path.dirname(__file__)
-            if core_path not in sys.path:
-                sys.path.insert(0, core_path)
-            from enhanced_fantasy_tool import EnhancedFantasyTool
-
-            print("🔄 Integrating NFL data for enhanced rankings...")
-            enhancer = EnhancedFantasyTool()
-
-            # Enhance projections with NFL data
-            enhanced_pool = enhancer.enhance_projections_with_nfl_data(
-                pool.copy(),
-                seasons_to_analyze=[
-                    2022,
-                    2023,
-                    2024,
-                ],  # Use multiple seasons for better analysis
-            )
-
-            # Add NFL metrics to scoring with fair treatment for younger players
-            # Adjust confidence score to be more fair to rookies and young players
-            enhanced_pool["nfl_confidence_score"] = (
-                # Games played component - use sqrt to reduce penalty for low game counts
-                np.sqrt(enhanced_pool["nfl_games_played"].fillna(0)) * 0.4
-                + enhanced_pool["nfl_consistency_score"].fillna(0.5)
-                * 0.4  # Default to neutral for rookies
-                + (enhanced_pool["nfl_trend"] == "Improving").astype(int).fillna(0)
-                * 0.2
-            )
-
-            # For rookies (0 games), give them a neutral confidence score instead of 0
-            rookie_mask = enhanced_pool["nfl_games_played"].fillna(0) == 0
-            enhanced_pool.loc[rookie_mask, "nfl_confidence_score"] = (
-                0.5  # Neutral score for rookies
-            )
-
-            # Adjust Points based on NFL confidence - reduce the impact for younger players
-            # Use a smaller multiplier and cap the adjustment
-            confidence_multiplier = (
-                enhanced_pool["nfl_confidence_score"] * 0.05
-            )  # Reduced from 0.1 to 0.05 (max 5% adjustment)
-            confidence_multiplier = confidence_multiplier.clip(
-                -0.05, 0.05
-            )  # Cap at ±5%
-
-            enhanced_pool["Points"] = enhanced_pool["Points"] * (
-                1 + confidence_multiplier
-            )
-
-            # Update pool with enhanced data
-            pool = enhanced_pool.copy()
-            print("✅ NFL data integrated into rankings")
-
-        except ImportError:
-            print("⚠️ NFL data integration not available - continuing without it")
-        except Exception as e:
-            print(f"⚠️ NFL data integration failed: {e} - continuing without it")
+    # NFL analytics feature has been removed
+    print("ℹ️ NFL analytics feature has been removed - continuing with standard projections")
 
     # Apply name normalization to both datasets
     adp_copy = adp.copy()
@@ -1874,16 +1796,6 @@ def main(
             }
         )
 
-        # Check if NFL data columns are available
-        nfl_columns = [
-            "nfl_games_played",
-            "nfl_avg_ppr",
-            "nfl_trend",
-            "nfl_consistency_score",
-            "nfl_team",
-        ]
-        available_nfl_cols = [col for col in nfl_columns if col in ov.columns]
-
         # Reorder columns for optimal draft use - Draft_Priority first for easy sorting
         base_columns = [
             "Draft_Priority",
@@ -1900,135 +1812,10 @@ def main(
             "Rank",
         ]
 
-        # Add NFL columns if available
-        if available_nfl_cols:
-            # Rename NFL columns for cleaner display
-            nfl_rename_map = {
-                "nfl_games_played": "NFL_Games",
-                "nfl_avg_ppr": "NFL_Avg_PPR",
-                "nfl_trend": "NFL_Trend",
-                "nfl_consistency_score": "NFL_Consistency",
-                "nfl_team": "NFL_Team",
-            }
-            ov = ov.rename(columns=nfl_rename_map)
-            available_nfl_cols = [
-                nfl_rename_map.get(col, col) for col in available_nfl_cols
-            ]
-            base_columns.extend(available_nfl_cols)
-
         ov = ov[base_columns]
         ov.to_excel(writer, sheet_name="Overall", index=False)
 
-        # Create NFL Data Analysis sheet if NFL data is available
-        if any(
-            col in overall.columns
-            for col in ["nfl_games_played", "nfl_avg_ppr", "nfl_trend"]
-        ):
-            print("📊 Creating NFL Data Analysis sheet...")
-
-            nfl_analysis = overall.copy()
-
-            # Filter to players with NFL data
-            nfl_players = nfl_analysis[
-                nfl_analysis["nfl_games_played"].notna()
-                & (nfl_analysis["nfl_games_played"] > 0)
-            ].copy()
-
-            if not nfl_players.empty:
-                # Create categories for different experience levels
-                nfl_players["Experience_Level"] = "Rookie"
-                nfl_players.loc[
-                    nfl_players["nfl_games_played"] >= 1, "Experience_Level"
-                ] = "Limited"
-                nfl_players.loc[
-                    nfl_players["nfl_games_played"] >= 5, "Experience_Level"
-                ] = "Established"
-                nfl_players.loc[
-                    nfl_players["nfl_games_played"] >= 16, "Experience_Level"
-                ] = "Veteran"
-
-                # Include ALL players with NFL data, not just those with 5+ games
-                meaningful_nfl_data = nfl_players.copy()
-
-                if not meaningful_nfl_data.empty:
-                    # Calculate NFL performance rankings (only for players with games played)
-                    has_games_mask = meaningful_nfl_data["nfl_games_played"] > 0
-                    if has_games_mask.any():
-                        meaningful_nfl_data.loc[has_games_mask, "NFL_PPR_Rank"] = (
-                            meaningful_nfl_data.loc[has_games_mask, "nfl_avg_ppr"].rank(
-                                ascending=False, method="dense"
-                            )
-                        )
-                        meaningful_nfl_data.loc[
-                            has_games_mask, "NFL_Consistency_Rank"
-                        ] = meaningful_nfl_data.loc[
-                            has_games_mask, "nfl_consistency_score"
-                        ].rank(
-                            ascending=False, method="dense"
-                        )
-                    else:
-                        meaningful_nfl_data["NFL_PPR_Rank"] = None
-                        meaningful_nfl_data["NFL_Consistency_Rank"] = None
-
-                    # Create comprehensive NFL analysis sheet
-                    nfl_sheet_data = meaningful_nfl_data[
-                        [
-                            "player",
-                            "position",
-                            "team",
-                            "Points",
-                            "VORP",
-                            "adp",
-                            "nfl_games_played",
-                            "nfl_avg_ppr",
-                            "nfl_trend",
-                            "nfl_consistency_score",
-                            "nfl_volume_trend",
-                            "nfl_team",
-                            "Experience_Level",
-                            "NFL_PPR_Rank",
-                            "NFL_Consistency_Rank",
-                        ]
-                    ].rename(
-                        columns={
-                            "player": "Player",
-                            "position": "Pos",
-                            "team": "Team",
-                            "nfl_games_played": "NFL_Games",
-                            "nfl_avg_ppr": "NFL_Avg_PPR",
-                            "nfl_trend": "Trend",
-                            "nfl_consistency_score": "Consistency",
-                            "nfl_volume_trend": "Volume_Trend",
-                            "nfl_team": "NFL_Team",
-                        }
-                    )
-
-                    # Sort by experience level first, then by NFL performance
-                    nfl_sheet_data = nfl_sheet_data.sort_values(
-                        ["Experience_Level", "NFL_Avg_PPR"], ascending=[True, False]
-                    )
-
-                    nfl_sheet_data.to_excel(
-                        writer, sheet_name="NFL_Analysis", index=False
-                    )
-                    print(
-                        f"✅ NFL Analysis sheet created with {len(nfl_sheet_data)} players (including all experience levels)"
-                    )
-                else:
-                    print("⚠️ No players found with NFL data for analysis sheet")
-
-                # Show summary of all NFL data by experience level
-                rookies_count = (nfl_players["nfl_games_played"] == 0).sum()
-                limited_data_count = (
-                    (nfl_players["nfl_games_played"] > 0)
-                    & (nfl_players["nfl_games_played"] < 5)
-                ).sum()
-                established_count = (nfl_players["nfl_games_played"] >= 5).sum()
-                veteran_count = (nfl_players["nfl_games_played"] >= 16).sum()
-
-                print(
-                    f"📊 NFL Data Summary: {veteran_count} veterans, {established_count - veteran_count} established, {limited_data_count} limited experience, {rookies_count} rookies"
-                )
+        # NFL Analysis sheet removed - NFL analytics feature has been removed
 
         # Position sheets with enhanced columns
         for pos, dfp in by_pos.items():

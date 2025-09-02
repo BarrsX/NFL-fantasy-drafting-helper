@@ -39,7 +39,6 @@ processed_data = {
     "by_position": {},
     "draft_board": None,
     "config": None,
-    "nfl_analytics": None,
 }
 
 # Cache management
@@ -407,216 +406,6 @@ def load_csv_data(filepath):
         return df
     except Exception as e:
         return pd.DataFrame()
-
-
-def process_nfl_analytics(projections_df, draft_board_df):
-    """Process NFL analytics data for enhanced draft decision making"""
-    try:
-        # Initialize NFL data integrator
-        from core.nfl_data_integration import NFLDataIntegrator
-        
-        nfl_integrator = NFLDataIntegrator()
-        
-        # Get recent seasons for analysis (use completed seasons only)
-        current_year = datetime.now().year
-        # For 2025, use 2022-2024 (or 2021-2023) since 2025 data won't be complete
-        if current_year >= 2025:
-            seasons = [2021, 2022, 2023]  # Use completed recent seasons
-        else:
-            seasons = [current_year - 2, current_year - 1]  # For past years, use recent complete seasons
-        
-        # Get weekly data for advanced metrics
-        weekly_data = nfl_integrator.get_weekly_data(seasons)
-        
-        if weekly_data.empty:
-            # Try fallback seasons if primary seasons fail
-            fallback_seasons = [2020, 2021, 2022]
-            weekly_data = nfl_integrator.get_weekly_data(fallback_seasons)
-            if not weekly_data.empty:
-                seasons = fallback_seasons
-        
-        if weekly_data.empty:
-            return create_basic_analytics(projections_df, draft_board_df)
-        
-        # Calculate advanced metrics
-        weekly_data = nfl_integrator.calculate_advanced_metrics(weekly_data)
-        
-        # Merge with projections data
-        analytics_df = projections_df.copy()
-        
-        # Add NFL analytics columns
-        analytics_df['nfl_games_played'] = 0
-        analytics_df['nfl_avg_ppr_points'] = 0.0
-        analytics_df['nfl_consistency_score'] = 0.0
-        analytics_df['nfl_trend_score'] = 0.0
-        analytics_df['nfl_risk_factor'] = 0.0
-        analytics_df['nfl_upside_potential'] = 0.0
-        
-        # Process each player
-        for idx, row in analytics_df.iterrows():
-            player_name = row['player']
-            
-            # Find matching NFL data
-            player_nfl_data = weekly_data[
-                weekly_data['player_display_name'].str.contains(
-                    player_name.split()[0], case=False, na=False
-                ) & 
-                weekly_data['player_display_name'].str.contains(
-                    player_name.split()[-1], case=False, na=False
-                )
-            ]
-            
-            if not player_nfl_data.empty:
-                # Filter for meaningful game participation (exclude weeks with no fantasy points and week > 18 for regular season)
-                # Regular season is weeks 1-18, playoffs are 19+
-                meaningful_games = player_nfl_data[
-                    (player_nfl_data['fantasy_points_ppr'] > 0) & 
-                    (player_nfl_data['week'] <= 18)  # Regular season only
-                ]
-                
-                # Calculate analytics metrics
-                games_played = len(meaningful_games)
-                avg_ppr = meaningful_games['fantasy_points_ppr'].mean() if games_played > 0 else 0
-                consistency = meaningful_games['fantasy_points_ppr'].std() / meaningful_games['fantasy_points_ppr'].mean() if avg_ppr > 0 else 1.0
-                trend = meaningful_games.groupby('season')['fantasy_points_ppr'].mean().pct_change().mean() if games_played > 10 else 0
-                
-                # Risk factor based on injuries and consistency
-                injury_data = nfl_integrator.get_injuries(seasons)
-                player_injuries = injury_data[
-                    injury_data['full_name'].str.contains(player_name.split()[0], case=False, na=False) &
-                    injury_data['full_name'].str.contains(player_name.split()[-1], case=False, na=False)
-                ]
-                
-                injury_risk = len(player_injuries) / max(games_played, 1) if not player_injuries.empty else 0
-                risk_factor = (consistency * 0.6) + (injury_risk * 0.4)
-                
-                # Upside potential based on best performances
-                upside = meaningful_games['fantasy_points_ppr'].quantile(0.9) / max(avg_ppr, 1) if avg_ppr > 0 else 1.0
-                
-                # Update analytics data
-                analytics_df.at[idx, 'nfl_games_played'] = games_played
-                analytics_df.at[idx, 'nfl_avg_ppr_points'] = round(avg_ppr, 2) if not np.isnan(avg_ppr) else 0
-                analytics_df.at[idx, 'nfl_consistency_score'] = round(1 - min(consistency, 1), 2) if not np.isnan(consistency) else 0
-                analytics_df.at[idx, 'nfl_trend_score'] = round(trend, 2) if not np.isnan(trend) else 0
-                analytics_df.at[idx, 'nfl_risk_factor'] = round(risk_factor, 2) if not np.isnan(risk_factor) else 0
-                analytics_df.at[idx, 'nfl_upside_potential'] = round(upside, 2) if not np.isnan(upside) else 0
-        
-        # Calculate NFL-adjusted priority scores
-        analytics_df['nfl_adjusted_priority'] = analytics_df.apply(
-            lambda row: calculate_nfl_adjusted_priority(row, draft_board_df), axis=1
-        )
-        
-        return analytics_df
-        
-    except Exception as e:
-        return create_basic_analytics(projections_df, draft_board_df)
-
-
-def create_basic_analytics(projections_df, draft_board_df):
-    """Create basic analytics when NFL data is not available"""
-    import random
-    analytics_df = projections_df.copy()
-    
-    # Initialize analytics columns
-    analytics_df['nfl_games_played'] = 0
-    analytics_df['nfl_avg_ppr_points'] = 0.0
-    analytics_df['nfl_consistency_score'] = 0.0
-    analytics_df['nfl_trend_score'] = 0.0
-    analytics_df['nfl_risk_factor'] = 0.0
-    analytics_df['nfl_upside_potential'] = 0.0
-    
-    # Generate realistic mock data based on player attributes
-    for idx, row in analytics_df.iterrows():
-        points = row.get('points', 0)
-        position = row.get('position', '')
-        rank = row.get('Rank', idx + 1)
-        adp = row.get('adp', 999)
-        
-        # Mock games played (simulate career length/experience)
-        if rank <= 50:  # Top players - more experienced
-            games_played = random.randint(40, 60)
-        elif rank <= 150:  # Mid-tier players 
-            games_played = random.randint(25, 45)
-        else:  # Lower ranked players
-            games_played = random.randint(10, 30)
-            
-        # Mock avg PPR based on projected points per game
-        avg_ppr = round(points / 17 + random.uniform(-2, 2), 1)  # 17 game season
-        
-        # Consistency score - higher for established players, lower for rookies/backups
-        if rank <= 24:  # Elite players - very consistent
-            consistency = random.uniform(0.75, 0.95)
-        elif rank <= 100:  # Good players - moderately consistent
-            consistency = random.uniform(0.55, 0.80)
-        else:  # Inconsistent players
-            consistency = random.uniform(0.25, 0.60)
-            
-        # Risk factor - inverse of consistency with position adjustments
-        base_risk = 1 - consistency
-        if position == 'RB':  # RBs have higher injury risk
-            risk_factor = min(base_risk + 0.1, 0.9)
-        elif position == 'QB':  # QBs generally lower injury risk
-            risk_factor = max(base_risk - 0.1, 0.1)
-        else:
-            risk_factor = base_risk
-            
-        # Trend score based on ADP vs rank (value players have positive trend)
-        if adp != 999 and adp > 0:
-            adp_diff = adp - rank
-            if adp_diff > 20:  # Being drafted later than ranked - positive trend
-                trend = random.uniform(0.05, 0.25)
-            elif adp_diff < -20:  # Being drafted earlier than ranked - negative trend
-                trend = random.uniform(-0.25, -0.05)
-            else:
-                trend = random.uniform(-0.05, 0.05)
-        else:
-            trend = random.uniform(-0.1, 0.1)
-            
-        # Upside potential - higher for younger players, lower ranked players
-        if rank <= 12:  # Elite players - lower upside (already at peak)
-            upside = random.uniform(1.05, 1.25)
-        elif rank <= 50:  # Good players - moderate upside
-            upside = random.uniform(1.15, 1.45)
-        else:  # Breakout candidates - higher upside potential
-            upside = random.uniform(1.25, 2.0)
-            
-        # Apply the calculated values
-        analytics_df.at[idx, 'nfl_games_played'] = games_played
-        analytics_df.at[idx, 'nfl_avg_ppr_points'] = max(avg_ppr, 0)
-        analytics_df.at[idx, 'nfl_consistency_score'] = round(consistency, 2)
-        analytics_df.at[idx, 'nfl_trend_score'] = round(trend, 2)
-        analytics_df.at[idx, 'nfl_risk_factor'] = round(risk_factor, 2)
-        analytics_df.at[idx, 'nfl_upside_potential'] = round(upside, 2)
-    
-    # Calculate NFL-adjusted priority scores
-    analytics_df['nfl_adjusted_priority'] = analytics_df.apply(
-        lambda row: calculate_nfl_adjusted_priority(row, draft_board_df), axis=1
-    )
-    
-    return analytics_df
-
-
-def calculate_nfl_adjusted_priority(row, draft_board_df):
-    """Calculate NFL-adjusted priority score"""
-    base_priority = row.get('points', 0)
-    
-    # NFL analytics factors
-    consistency_bonus = row.get('nfl_consistency_score', 0.5) * 0.2
-    trend_bonus = row.get('nfl_trend_score', 0) * 0.1
-    risk_penalty = (1 - row.get('nfl_risk_factor', 0.5)) * 0.15
-    upside_bonus = row.get('nfl_upside_potential', 1.0) * 0.1
-    
-    # Experience factor
-    games_played = row.get('nfl_games_played', 0)
-    experience_factor = min(games_played / 50, 0.2)  # Max 20% bonus for experience
-    
-    # Calculate adjusted priority
-    adjusted_priority = base_priority * (
-        1.0 + consistency_bonus + trend_bonus + risk_penalty + 
-        upside_bonus + experience_factor
-    )
-    
-    return round(adjusted_priority, 2)
 
 
 def process_data_for_web():
@@ -1160,16 +949,6 @@ def process_data_for_web():
             }
             processed_data["draft_board"] = clean_dataframe_for_json(draft_board)
 
-            # Process NFL analytics data
-            try:
-                nfl_analytics = process_nfl_analytics(projections_for_frontend, draft_board)
-                
-                processed_data["nfl_analytics"] = clean_dataframe_for_json(nfl_analytics)
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                processed_data["nfl_analytics"] = pd.DataFrame()
-
             # Update cache timestamp
             update_cache_timestamp()
             
@@ -1245,21 +1024,6 @@ def get_draft_board():
             return jsonify(data)
         except Exception as e:
             return jsonify({"error": "Data conversion failed"}), 500
-    return jsonify([])
-
-
-@app.route("/api/nfl_analytics")
-@gzip_response
-def get_nfl_analytics():
-    """API endpoint for NFL analytics data"""
-    
-    if processed_data["nfl_analytics"] is not None:
-        try:
-            data = processed_data["nfl_analytics"].to_dict("records")
-            return jsonify(data)
-        except Exception as e:
-            return jsonify({"error": "Data conversion failed"}), 500
-    
     return jsonify([])
 
 
