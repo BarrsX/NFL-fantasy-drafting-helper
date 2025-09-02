@@ -6,7 +6,7 @@
                 {
                     "name": "2025_Projections",
                     "path": "D:/Coding/fantasy drafting/data/projections_2025_offense_only.csv",
-                    "weight": 0.50
+                    "weight": 0.5
                 },
                 {
                     "name": "WR_Rankings",
@@ -28,29 +28,15 @@
             "outlier_threshold": 2.0
         },
         "league": {
-            "use_idp": true,
+            "num_teams": 12,
             "superflex": true,
-            "num_teams": 10,
             "starters": {
                 "QB": 1,
                 "RB": 2,
                 "WR": 3,
                 "TE": 1,
                 "FLEX": 2,
-                "DL": 1,
-                "LB": 2,
-                "DB": 1,
-                "IDP_FLEX": 1
-            },
-            "superflex_qb_per_team": 1.0,
-            "bench_factor": {
-                "QB": 1.5,
-                "RB": 0.7,
-                "WR": 0.8,
-                "TE": 0.5,
-                "DL": 0.5,
-                "LB": 0.6,
-                "DB": 0.5
+                "SUPERFLEX": 1
             }
         },
         "tiers": {
@@ -68,25 +54,64 @@
         "scoring": {
             "offense": {
                 "pass_yd": 0.04,
-                "pass_td": 4.0,
-                "pass_int": -2.0,
+                "pass_td": 4,
+                "pass_int": -2,
+                "pass_2pt": 2,
                 "rush_yd": 0.1,
-                "rush_td": 6.0,
-                "rec": 1.0,
+                "rush_td": 6,
+                "rush_2pt": 2,
+                "rec": 1,
                 "rec_yd": 0.1,
-                "rec_td": 6.0,
-                "fumble": -2.0
+                "rec_td": 6,
+                "rec_2pt": 2
             },
-            "idp": {
-                "tackle": 1.0,
-                "assist": 0.5,
-                "sack": 4.0,
-                "int": 6.0,
-                "fumble_rec": 4.0,
-                "pass_def": 2.0,
-                "td": 6.0,
-                "safety": 2.0,
-                "block": 4.0
+            "kicking": {
+                "fg_0_19": 3,
+                "fg_20_29": 3,
+                "fg_30_39": 3,
+                "fg_40_49": 4,
+                "fg_50_59": 5,
+                "fg_60_plus": 6,
+                "pat_made": 1,
+                "fg_missed": -1,
+                "pat_missed": -1
+            },
+            "defense": {
+                "def_td": 6,
+                "pts_allowed_0": 5,
+                "pts_allowed_1_6": 4,
+                "pts_allowed_7_13": 3,
+                "pts_allowed_14_20": 1,
+                "pts_allowed_28_34": -1,
+                "pts_allowed_35_plus": -4,
+                "yds_allowed_lt_100": 5,
+                "yds_allowed_100_199": 3,
+                "yds_allowed_200_299": 2,
+                "yds_allowed_350_399": -1,
+                "yds_allowed_400_449": -3,
+                "yds_allowed_450_499": -5,
+                "yds_allowed_500_549": -6,
+                "yds_allowed_550_plus": -7,
+                "sack": 1,
+                "interception": 2,
+                "fum_rec": 2,
+                "safety": 2,
+                "forced_fum": 1,
+                "blocked_kick": 2
+            },
+            "special_teams_def": {
+                "st_def_td": 6,
+                "st_def_forced_fum": 1,
+                "st_def_fum_rec": 1
+            },
+            "special_teams_player": {
+                "st_player_td": 6,
+                "st_player_forced_fum": 1,
+                "st_player_fum_rec": 1
+            },
+            "misc": {
+                "fum_lost": -2,
+                "fum_rec_td": 6
             }
         },
         "strategy": {

@@ -1281,14 +1281,8 @@ def normalize_player_name(name):
     # Handle other common name variations
     import re
 
-    # Remove apostrophes (Ja'Marr -> JaMarr, De'Von -> DeVon)
-    name = name.replace("'", "")
-
-    # Remove periods (A.J. -> AJ, C.J. -> CJ)
-    name = name.replace(".", "")
-
-    # Standardize hyphens (Amon-Ra -> AmonRa, Jaxon Smith-Njigba -> Jaxon SmithNjigba)
-    name = name.replace("-", "")
+    # Remove all punctuation except letters, numbers, and spaces
+    name = re.sub(r"[^\w\s]", "", name)
 
     # Remove extra spaces and normalize spacing
     name = re.sub(r"\s+", " ", name).strip()
@@ -1666,7 +1660,9 @@ def main(
         pool = off.copy()
 
     # NFL analytics feature has been removed
-    print("ℹ️ NFL analytics feature has been removed - continuing with standard projections")
+    print(
+        "ℹ️ NFL analytics feature has been removed - continuing with standard projections"
+    )
 
     # Apply name normalization to both datasets
     adp_copy = adp.copy()

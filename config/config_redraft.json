@@ -28,7 +28,7 @@
       "outlier_threshold": 2.0
     },
     "league": {
-      "num_teams": 2,
+      "num_teams": 12,
       "superflex": true,
       "starters": {
         "QB": 1,

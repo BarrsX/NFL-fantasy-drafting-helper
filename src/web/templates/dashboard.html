@@ -362,7 +362,7 @@
             type="button"
             role="tab"
           >
-            <i class="fas fa-route-highway me-1"></i> WR
+            <i class="fas fa-bolt me-1"></i> WR
           </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -1975,7 +1975,7 @@
             document.getElementById("teStarters").value = starters.TE || 1;
             document.getElementById("flexStarters").value = starters.FLEX || 1;
             document.getElementById("superflexStarters").value =
-              starters.SUPERFLEX || 1;
+              starters.SUPERFLEX !== undefined ? starters.SUPERFLEX : 1;
 
             // Load scoring settings
             const offense = config.scoring?.offense || {};
