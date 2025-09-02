@@ -6,9 +6,29 @@ A comprehensive tool for generating optimized fantasy football draft cheat sheet
 
 ### One-Command Workflow (Recommended)
 
-```batch
-.\generate_cheatsheet.bat
-```
+``├── 📁 scripts/ # 🐍 Python scripts
+│ ├── 📁 core/ # Core functionality
+│ │ └── 📄 sleeper_cheatsheet.py
+│ ├── 📁 utils/ # Utility scripts
+│ │ ├── 📄 add_strikethrough_formatting.py
+│ │ └── 📄 ...
+│ ├── 📁 run/ # 🚀 Run scripts
+│ │ ├── 📄 run_web_dashboard.bat
+│ │ └── 📄 ...
+│ └── 📁 build/ # Build scripts
+│ ├── 📄 generate_cheatsheet.bat
+│ └── 📄 ...
+│
+├── 📁 src/ # 🌐 Web application
+│ └── 📁 web/ # Web dashboard
+│ ├── 📄 app.py # Flask application
+│ ├── 📄 run_dashboard.py # Dashboard runner
+│ ├── 📁 templates/ # HTML templates
+│ │ └── 📄 dashboard.html # Main dashboard
+│ └── 📁 static/ # Static assets
+│erate_cheatsheet.bat
+
+````
 
 **What happens automatically:**
 
@@ -18,6 +38,54 @@ A comprehensive tool for generating optimized fantasy football draft cheat sheet
 - ✅ Creates a fully formatted Excel file ready for live drafting
 
 **Result:** A complete draft board in `output/dynasty_superflex_cheatsheet.xlsx`
+
+## 🌐 Web Dashboard
+
+### Overview
+
+The Fantasy Drafting Web Dashboard provides a modern, interactive web interface for your draft cheat sheets with the same powerful features as the Excel version.
+
+### Quick Web Start
+
+```batch
+# Run the web dashboard
+.\scripts\run\run_web_dashboard.bat
+````
+
+**Features:**
+
+- ✅ **Interactive Draft Board** - Real-time draft tracking with live updates
+- ✅ **Multi-Tab Interface** - Overall rankings + position-specific views
+- ✅ **Advanced Search & Filter** - Find players instantly across all data
+- ✅ **Responsive Design** - Works on desktop, tablet, and mobile
+- ✅ **Live Drafting** - Mark players as drafted with automatic strikethrough
+- ✅ **Color-Coded Tiers** - Visual tier representation with value indicators
+
+**Access:** Navigate to `http://localhost:5000` in your browser
+
+### Web Dashboard Features
+
+#### Core Functionality
+
+- **Overall Rankings** - Complete player rankings with draft priorities
+- **Position-Specific Views** - Dedicated tabs for QB, RB, WR, TE
+- **Draft Board** - Simplified view optimized for live drafting
+- **Real-time Search** - Search players across all tabs instantly
+
+#### Visual Features
+
+- **Tier-Based Coloring** - Different colors for each tier (1-5)
+- **Value Indicators** - Highlight steals, values, and reaches
+- **Scarcity Indicators** - Mark cliff and drop-off players
+- **Position Badges** - Color-coded position indicators
+- **Responsive Design** - Works seamlessly on all devices
+
+#### Draft Features
+
+- **Live Draft Tracking** - Mark players as drafted during live drafts
+- **Round/Pick Tracking** - Record which round and pick players were drafted
+- **Draft Reset** - Reset the entire draft if needed
+- **Interactive Drafting** - Click to mark players as drafted
 
 ## 📋 Prerequisites
 
@@ -34,6 +102,10 @@ A comprehensive tool for generating optimized fantasy football draft cheat sheet
 - `numpy` - Numerical computations
 - `openpyxl` - Excel file handling
 - `pywin32` - Windows/Excel integration (optional, for advanced formatting)
+- `flask` - Web framework for dashboard
+- `flask-cors` - Cross-origin resource sharing for API
+- `flask-compress` - Response compression for better performance
+- `gunicorn` - Production WSGI server (optional)
 
 ## 🛠️ Installation
 
@@ -109,12 +181,21 @@ Josh Allen,QB,BUF,4500,35,350,3,0,0
 
 ## 🎯 Usage
 
-### Basic Usage
+### Excel Cheat Sheet (Default)
 
 ```batch
 # Generate cheat sheet with automatic formatting
 .\generate_cheatsheet.bat
 ```
+
+### Web Dashboard
+
+```batch
+# Run interactive web dashboard
+.\scripts\run\run_web_dashboard.bat
+```
+
+**Access:** Open `http://localhost:5000` in your browser
 
 ### Manual Formatting (If Needed)
 
@@ -173,6 +254,15 @@ Edit `configs/config_dynasty.json` to modify:
 - ✅ **Multiple Sheets** - Overall + position-specific views
 - ✅ **Conditional Formatting** - Automatic visual updates
 
+### Web Dashboard Features
+
+- ✅ **Interactive Draft Board** - Click-to-draft with live updates
+- ✅ **Real-time Search** - Instant player search across all tabs
+- ✅ **Responsive Design** - Works on desktop, tablet, and mobile
+- ✅ **Multi-Tab Interface** - Overall + position-specific rankings
+- ✅ **Live Draft Tracking** - Track rounds, picks, and drafted players
+- ✅ **Visual Tier System** - Color-coded tiers with value indicators
+
 ### Advanced Features
 
 - ✅ **IDP Support** - Defensive player projections and rankings
@@ -201,17 +291,19 @@ fantasy-drafting/
 │   ├── 📄 config_redraft.json     # Redraft league settings
 │   └── 📄 config_superflex.json   # Superflex settings
 │
-├── 📁 scripts/                    # 🐍 Python scripts
+├── 📁 src/                        # 🐍 Source code
 │   ├── 📁 core/                   # Core functionality
 │   │   └── 📄 sleeper_cheatsheet.py
-│   ├── 📁 formatting/             # Excel formatting tools
-│   │   ├── 📄 setup_excel_formatting.ps1
+│   ├── 📁 utils/                  # Utility scripts
 │   │   ├── 📄 add_strikethrough_formatting.py
-│   │   └── 📄 auto_setup_formatting.py
-│   └── 📁 utilities/              # Helper scripts
-│       ├── 📄 check_adp_status.py
-│       ├── 📄 test_normalization.py
-│       └── 📄 ...
+│   │   └── 📄 ...
+│   └── 📁 web/                    # 🌐 Web dashboard
+│       ├── 📄 app.py              # Flask application
+│       ├── 📄 run_dashboard.py    # Dashboard runner
+│       ├── � templates/          # HTML templates
+│       │   └── 📄 dashboard.html  # Main dashboard
+│       └── � static/             # Static assets
+│
 │
 ├── 📁 output/                     # 📤 Generated files
 │   └── 📄 dynasty_superflex_cheatsheet.xlsx
@@ -254,12 +346,31 @@ fantasy-drafting/
 pip install -r requirements.txt
 ```
 
+#### "Dashboard won't start"
+
+**Solution:**
+
+1. Ensure Flask is installed: `pip install flask flask-cors`
+2. Check that all data files exist in the `data/` directory
+3. Verify configuration files are present
+4. Try running: `python src/web/app.py` directly
+
+#### "No data displayed in dashboard"
+
+**Solution:**
+
+1. Check browser console for JavaScript errors
+2. Verify the Flask server is running on port 5000
+3. Ensure CSV data files are properly formatted
+4. Clear browser cache and refresh
+
 ### Getting Help
 
 1. **Check the logs** - The batch file shows detailed error messages
 2. **Verify data files** - Ensure CSV files are properly formatted
 3. **Test components** - Run individual scripts to isolate issues
 4. **Check Excel** - Ensure Excel isn't blocking automation
+5. **Web dashboard** - Check browser developer tools for console errors
 
 ## 🚀 Advanced Usage
 
@@ -303,4 +414,4 @@ The tool can fetch live ADP data from Sleeper:
 
 **Happy Drafting!** 🏈✨
 
-_Last updated: August 31, 2025_
+_Last updated: September 1, 2025_

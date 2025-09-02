@@ -38,8 +38,14 @@ A modern web-based dashboard for fantasy football drafting with the same feature
 2. **Run the Dashboard**:
 
    ```bash
-   cd web_dashboard
+   cd src/web
    python run_dashboard.py
+   ```
+
+   Or use the batch file:
+
+   ```batch
+   .\scripts\run\run_web_dashboard.bat
    ```
 
 3. **Open in Browser**:
@@ -121,7 +127,7 @@ The dashboard requires the same data files as the Excel output:
 ### Project Structure
 
 ```
-web_dashboard/
+src/web/
 ├── app.py                 # Main Flask application
 ├── run_dashboard.py       # Run script with dependency management
 ├── templates/
@@ -134,6 +140,16 @@ web_dashboard/
 1. Update the Flask routes in `app.py`
 2. Modify the HTML template in `templates/dashboard.html`
 3. Add CSS styles or JavaScript functions as needed
+
+### Batch File Usage
+
+For Windows users, you can also run the dashboard using the provided batch file:
+
+```batch
+.\scripts\run\run_web_dashboard.bat
+```
+
+This will automatically install dependencies and start the dashboard.
 
 ## License
 
